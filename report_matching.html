@@ -1,0 +1,1703 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Report Matching Transazioni</title>
+  <style>
+    :root {
+      --green: #16a34a; --red: #dc2626;
+      --bg: #f8fafc; --card: #ffffff; --border: #e2e8f0;
+      --text: #1e293b; --muted: #64748b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg); color: var(--text); padding: 2rem; line-height: 1.5;
+    }
+    h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
+    .meta { color: var(--muted); font-size: 0.875rem; margin-bottom: 1.5rem; }
+    .summary { display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+    .summary-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 8px; padding: 1rem 1.5rem; min-width: 140px;
+    }
+    .summary-card .value { font-size: 1.75rem; font-weight: 700; }
+    .summary-card .label { font-size: 0.8rem; color: var(--muted); }
+    .summary-card.matched .value { color: var(--green); }
+    .summary-card.unmatched .value { color: var(--red); }
+    table {
+      width: 100%; border-collapse: collapse; background: var(--card);
+      border: 1px solid var(--border); border-radius: 8px; overflow: hidden; font-size: 0.875rem;
+    }
+    th { background: #f1f5f9; text-align: left; padding: 0.75rem 1rem; font-weight: 600; border-bottom: 1px solid var(--border); }
+    td { padding: 0.6rem 1rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    tr.match { background: #f0fdf4; }
+    tr.no-match { background: #fef2f2; }
+    .status { font-size: 1.25rem; text-align: center; width: 3rem; }
+    .amount { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .description { max-width: 280px; word-break: break-word; }
+    .identificativo { font-weight: 600; display: block; }
+    .detail { color: var(--muted); font-size: 0.8rem; display: block; }
+    .llm-reason {
+      color: #475569; font-size: 0.8rem; display: block; margin-top: 0.35rem;
+      padding: 0.35rem 0.5rem; background: #f1f5f9; border-radius: 4px;
+    }
+    .llm-reason-label { font-weight: 600; color: #334155; }
+    .llm-confidence {
+      display: inline-block; font-size: 0.75rem; font-weight: 700;
+      padding: 0.15rem 0.45rem; border-radius: 4px; margin-top: 0.35rem;
+      text-transform: uppercase; letter-spacing: 0.02em;
+    }
+    .llm-confidence-alto { background: #dcfce7; color: #166534; }
+    .llm-confidence-medio { background: #fef9c3; color: #854d0e; }
+    .llm-confidence-basso { background: #fee2e2; color: #991b1b; }
+    .status-text { font-weight: 600; }
+    tr.match .status-text { color: var(--green); }
+    tr.no-match .status-text { color: var(--red); }
+  </style>
+</head>
+<body>
+  <h1>Report Matching Transazioni</h1>
+  <p class="meta">Generato il 15/06/2026 23:40 — Run #1 — matcher llm — modello gpt-5.4-mini-2026-03-17 — batch 1</p>
+  <div class="summary"><div class="summary-card ">
+  <div class="value">203</div>
+  <div class="label">Transazioni carta</div>
+</div><div class="summary-card matched">
+  <div class="value">101</div>
+  <div class="label">✅ Match</div>
+</div><div class="summary-card unmatched">
+  <div class="value">102</div>
+  <div class="label">❌ Senza match</div>
+</div></div>
+  <table>
+    <thead><tr><th>#</th><th></th><th>Data</th><th>Descrizione (carta)</th><th>Importo</th><th>Esito</th><th>Dettaglio</th></tr></thead>
+    <tbody><tr class="match">
+  <td>1</td>
+  <td class="status">✅</td>
+  <td>06/08/2026</td>
+  <td class="description">EG*TRVL73443592561624   0269430760</td>
+  <td class="amount">938,09</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">PRT 26 651</span><span class="detail">03/08/2026 — EXPEDIA INC.    MARSILI MARIA MILVIA</span><span class="llm-confidence llm-confidence-medio">Affidabilità: Medio</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Match probabile per ospite MARSILI MARIA MILVIA e importo Expedia/gestionale coerenti, ma il nome hotel non compare nella riga SIAP.</span></td>
+</tr><tr class="match">
+  <td>2</td>
+  <td class="status">✅</td>
+  <td>06/08/2026</td>
+  <td class="description">EG*TRVL73468961378449   0269430760</td>
+  <td class="amount">510,66</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">998 26 324</span><span class="detail">09/06/2026 — 296 HOTEL ATLANTIC  MASSETTI ANTONINO</span><span class="llm-confidence llm-confidence-alto">Affidabilità: Alto</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Match univoco su hotel e ospite; importo gestionale 540.00 molto vicino alla transazione Expedia 510.66.</span></td>
+</tr><tr class="no-match">
+  <td>3</td>
+  <td class="status">❌</td>
+  <td>06/08/2026</td>
+  <td class="description">IMPOSTA DI BOLLO</td>
+  <td class="amount">2,00</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>4</td>
+  <td class="status">❌</td>
+  <td>06/08/2026</td>
+  <td class="description">WWW.AUTOEUROPE.DE       MUNICH</td>
+  <td class="amount">337,42</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="match">
+  <td>5</td>
+  <td class="status">✅</td>
+  <td>06/06/2026</td>
+  <td class="description">EG*TRVL73452840520878   0269430760</td>
+  <td class="amount">291,08</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">PRT 26 497</span><span class="detail">14/06/2026 — EXPEDIA INC.    PISTILLI MOIRA</span><span class="llm-confidence llm-confidence-alto">Affidabilità: Alto</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Match univoco con stessa ospite e importo coerente; la riga gestionale Expedia INC. del 14/06/26 corrisponde alla prenotazione Expedia.</span></td>
+</tr><tr class="match">
+  <td>6</td>
+  <td class="status">✅</td>
+  <td>06/05/2026</td>
+  <td class="description">EG*TRVL73466421505068   0269430760</td>
+  <td class="amount">1.069,89</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">998 26 314</span><span class="detail">07/06/2026 — 386 JAM HOTEL BRUSS FRONTONI EMANUELE</span><span class="llm-confidence llm-confidence-alto">Affidabilità: Alto</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Match univoco con stessa ospite e hotel troncato coerente; importo SIAP 1100,00 vicino alla prenotazione Expedia 1069,89.</span></td>
+</tr><tr class="match">
+  <td>7</td>
+  <td class="status">✅</td>
+  <td>06/05/2026</td>
+  <td class="description">EG*TRVL73466616161069   0269430760</td>
+  <td class="amount">78,61</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">998 26 316</span><span class="detail">08/06/2026 — 091 B &amp; B VERDE NAT KACMOLI LUIZ</span><span class="llm-confidence llm-confidence-alto">Affidabilità: Alto</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Match univoco: stessa struttura e ospite KACMOLI/LUIZ, importo 85 vicino alla transazione Expedia.</span></td>
+</tr><tr class="match">
+  <td>8</td>
+  <td class="status">✅</td>
+  <td>06/05/2026</td>
+  <td class="description">EG*TRVL73466618063425   0269430760</td>
+  <td class="amount">290,04</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">998 26 317</span><span class="detail">09/06/2026 — 594 AS HOTEL LIMBIA KACMOLI LUIZ</span><span class="llm-confidence llm-confidence-alto">Affidabilità: Alto</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Match univoco su hotel e cognome/nome ospite; importo 294.00 molto vicino al pagamento Expedia 290.04, probabile arrotondamento/variazione.</span></td>
+</tr><tr class="match">
+  <td>9</td>
+  <td class="status">✅</td>
+  <td>06/05/2026</td>
+  <td class="description">EG*TRVL73466626393824   0269430760</td>
+  <td class="amount">567,12</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">998 26 315</span><span class="detail">08/06/2026 — 909 IBIS MARSEILLE  LIPIRA CALOGEROLUCA</span><span class="llm-confidence llm-confidence-alto">Affidabilità: Alto</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Hotel e ospite coincidono chiaramente con la riga 998 26 315; importo e data sono coerenti con la prenotazione Expedia.</span></td>
+</tr><tr class="match">
+  <td>10</td>
+  <td class="status">✅</td>
+  <td>06/05/2026</td>
+  <td class="description">EG*TRVL73466717604485   0269430760</td>
+  <td class="amount">209,33</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">998 26 322</span><span class="detail">10/06/2026 — 115 BEST WESTERN HO MIGNINI ANDREA</span><span class="llm-confidence llm-confidence-alto">Affidabilità: Alto</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Match chiaro: stesso ospite MIGNINI/ANDREA e hotel Best Western; importo SIAP 220.00 coerente con la prenotazione Expedia.</span></td>
+</tr><tr class="match">
+  <td>11</td>
+  <td class="status">✅</td>
+  <td>06/05/2026</td>
+  <td class="description">EG*TRVL73466839666681   0269430760</td>
+  <td class="amount">179,00</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">998 26 323</span><span class="detail">06/06/2026 — 390 HOLIDAY INN MIL FORLI' MASSIMO</span><span class="llm-confidence llm-confidence-alto">Affidabilità: Alto</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Match chiaro: stessa data 06/05/26, importo 200.00 molto vicino al pagamento Expedia 179.00 e descrizione hotel coerente con Holiday Inn Milan.</span></td>
+</tr><tr class="no-match">
+  <td>12</td>
+  <td class="status">❌</td>
+  <td>06/05/2026</td>
+  <td class="description">FEDEX159199186 FEDEX EX SEGRATE</td>
+  <td class="amount">52,22</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="match">
+  <td>13</td>
+  <td class="status">✅</td>
+  <td>06/05/2026</td>
+  <td class="description">RYANAIR LTD AIRLINE     DUBLIN</td>
+  <td class="amount">102,98</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">LOW 8814 20</span><span class="detail">06/06/2026 — RYA RYANAIR         GARDEVA RADOSLAVA IV</span></td>
+</tr><tr class="match">
+  <td>14</td>
+  <td class="status">✅</td>
+  <td>06/05/2026</td>
+  <td class="description">RYANAIR LTD AIRLINE     DUBLIN</td>
+  <td class="amount">203,44</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">LOW 8816 20</span><span class="detail">08/06/2026 — RYA RYANAIR         LIPIRA/CALOGEROLUCA</span></td>
+</tr><tr class="no-match">
+  <td>15</td>
+  <td class="status">❌</td>
+  <td>06/05/2026</td>
+  <td class="description">RYANAIR LTD AIRLINE     DUBLIN</td>
+  <td class="amount">354,72</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="match">
+  <td>16</td>
+  <td class="status">✅</td>
+  <td>06/05/2026</td>
+  <td class="description">RYANAIR LTD AIRLINE     DUBLIN</td>
+  <td class="amount">477,44</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">LOW 8815 20</span><span class="detail">11/09/2026 — RYA RYANAIR         MICOCCI SERGIO</span></td>
+</tr><tr class="no-match">
+  <td>17</td>
+  <td class="status">❌</td>
+  <td>06/05/2026</td>
+  <td class="description">TRENITALIA WEB AGENCY   ROMA</td>
+  <td class="amount">22,10</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="match">
+  <td>18</td>
+  <td class="status">✅</td>
+  <td>06/05/2026</td>
+  <td class="description">WIZZ AIR MALTA LIMITED  VALETTA</td>
+  <td class="amount">455,92</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">BAW 2540 20</span><span class="detail">14/08/2026 — WIZ WIZZ AIR        SHUKA DESARA</span></td>
+</tr><tr class="no-match">
+  <td>19</td>
+  <td class="status">❌</td>
+  <td>06/04/2026</td>
+  <td class="description">DAT AS                  Vamdrup</td>
+  <td class="amount">212,06</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="match">
+  <td>20</td>
+  <td class="status">✅</td>
+  <td>06/04/2026</td>
+  <td class="description">EG*TRVL73465564683277   0269430760</td>
+  <td class="amount">128,04</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">998 26 319</span><span class="detail">08/06/2026 — 388 HOOOME          SPINOZZI ALFREDO</span><span class="llm-confidence llm-confidence-alto">Affidabilità: Alto</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Match univoco su hotel Hooome e ospite SPINOZZI/ALFREDO; importo e data coerenti con la prenotazione Expedia.</span></td>
+</tr><tr class="match">
+  <td>21</td>
+  <td class="status">✅</td>
+  <td>06/04/2026</td>
+  <td class="description">EG*TRVL73465616664818   0269430760</td>
+  <td class="amount">1.952,92</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">998 26 320</span><span class="detail">09/06/2026 — 389 HILTON GARDEN I SPINOZZA/ALFREDO</span><span class="llm-confidence llm-confidence-alto">Affidabilità: Alto</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Match univoco su ospite SPINOZZI/ALFREDO e hotel Hilton Garden Inn; importo coerente con prenotazione Expedia.</span></td>
+</tr><tr class="match">
+  <td>22</td>
+  <td class="status">✅</td>
+  <td>06/04/2026</td>
+  <td class="description">RYANAIR LTD AIRLINE     DUBLIN</td>
+  <td class="amount">166,81</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">LOW 8817 20</span><span class="detail">08/06/2026 — RYA RYANAIR         SPINOZZI/ALFREDO</span></td>
+</tr><tr class="no-match">
+  <td>23</td>
+  <td class="status">❌</td>
+  <td>06/04/2026</td>
+  <td class="description">USCUSTOMS ESTA APPL PMT INDIANAPOLIS</td>
+  <td class="amount">35,58</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>24</td>
+  <td class="status">❌</td>
+  <td>06/04/2026</td>
+  <td class="description">USCUSTOMS ESTA APPL PMT INDIANAPOLIS</td>
+  <td class="amount">35,58</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>25</td>
+  <td class="status">❌</td>
+  <td>06/04/2026</td>
+  <td class="description">WWW.DELPHINA.IT         PALAU</td>
+  <td class="amount">-1.042,00</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="match">
+  <td>26</td>
+  <td class="status">✅</td>
+  <td>06/03/2026</td>
+  <td class="description">EASYJET                 LUTON</td>
+  <td class="amount">586,88</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">BAW 2536 20</span><span class="detail">0/00/00 — EAS EASY JET        BIANCONI GABRIELE</span></td>
+</tr><tr class="match">
+  <td>27</td>
+  <td class="status">✅</td>
+  <td>06/03/2026</td>
+  <td class="description">EG*TRVL73464827949418   0269430760</td>
+  <td class="amount">569,94</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">998 26 313</span><span class="detail">04/06/2026 — 385 PARK INN BY RAD CAVALLARO DANILO</span><span class="llm-confidence llm-confidence-alto">Affidabilità: Alto</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Match univoco: ospite CAVALLARO DANILO e hotel Park Inn by Radisson troncato in SIAP; importo coerente.</span></td>
+</tr><tr class="match">
+  <td>28</td>
+  <td class="status">✅</td>
+  <td>06/03/2026</td>
+  <td class="description">EG*TRVL73464906036425   0269430760</td>
+  <td class="amount">924,54</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">PRT 26 635</span><span class="detail">07/06/2026 — EXPEDIA INC.    DI SALVATORE CLAUDIA</span><span class="llm-confidence llm-confidence-alto">Affidabilità: Alto</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Match univoco con riga Expedia INC. intestata a DI SALVATORE CLAUDIA e importo coerente con la prenotazione.</span></td>
+</tr><tr class="match">
+  <td>29</td>
+  <td class="status">✅</td>
+  <td>06/03/2026</td>
+  <td class="description">FLIXBUS.COM             MUNICH</td>
+  <td class="amount">54,97</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">AUT 1496 20</span><span class="detail">08/06/2026 — FB  FLIXBUS ITALIA  RENZI/DANIELE</span></td>
+</tr><tr class="match">
+  <td>30</td>
+  <td class="status">✅</td>
+  <td>06/03/2026</td>
+  <td class="description">RYANAIR LTD AIRLINE     DUBLIN</td>
+  <td class="amount">192,00</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">ABP 469 20</span><span class="detail">0/00/00 — RYA RYANAIR         TOFONI FABRIZIO</span></td>
+</tr><tr class="match">
+  <td>31</td>
+  <td class="status">✅</td>
+  <td>06/03/2026</td>
+  <td class="description">RYANAIR LTD AIRLINE     DUBLIN</td>
+  <td class="amount">404,94</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">BAW 2535 20</span><span class="detail">05/08/2026 — RYA RYANAIR         BIANCONI GABRIELE</span></td>
+</tr><tr class="match">
+  <td>32</td>
+  <td class="status">✅</td>
+  <td>06/03/2026</td>
+  <td class="description">RYANAIR LTD AIRLINE     DUBLIN</td>
+  <td class="amount">814,68</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">BAW 2534 20</span><span class="detail">31/07/2026 — RYA RYANAIR         BIANCONI GABRIELE</span></td>
+</tr><tr class="match">
+  <td>33</td>
+  <td class="status">✅</td>
+  <td>06/03/2026</td>
+  <td class="description">RYANAIR LTD AIRLINE     DUBLIN</td>
+  <td class="amount">837,18</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">LOW 8813 20</span><span class="detail">16/08/2026 — RYA RYANAIR         PAPILI LAURA</span></td>
+</tr><tr class="no-match">
+  <td>34</td>
+  <td class="status">❌</td>
+  <td>06/03/2026</td>
+  <td class="description">TRENITALIA WEB AGENCY   ROMA</td>
+  <td class="amount">38,00</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>35</td>
+  <td class="status">❌</td>
+  <td>06/03/2026</td>
+  <td class="description">USCUSTOMS ESTA APPL PMT INDIANAPOLIS</td>
+  <td class="amount">35,59</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>36</td>
+  <td class="status">❌</td>
+  <td>06/03/2026</td>
+  <td class="description">USCUSTOMS ESTA APPL PMT INDIANAPOLIS</td>
+  <td class="amount">35,59</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="match">
+  <td>37</td>
+  <td class="status">✅</td>
+  <td>06/02/2026</td>
+  <td class="description">EG*TRVL73455348144809   0269430760</td>
+  <td class="amount">391,49</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">998 26 294</span><span class="detail">10/06/2026 — 381 THREE CORNERS H DEASCENTIIS/ARIANNA</span><span class="llm-confidence llm-confidence-alto">Affidabilità: Alto</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Match univoco su hotel e ospite; importo e data sono coerenti con la riga SIAP.</span></td>
+</tr><tr class="match">
+  <td>38</td>
+  <td class="status">✅</td>
+  <td>06/01/2026</td>
+  <td class="description">EG*TRVL73455313593271   0269430760</td>
+  <td class="amount">179,99</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">998 26 292</span><span class="detail">08/06/2026 — 612 VAN DER VALK HO DEASCENTIIS/ARIANNA</span><span class="llm-confidence llm-confidence-alto">Affidabilità: Alto</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Match univoco per ospite DEASCENTIIS/ARIANNA e hotel Van Der Valk; importo/data coerenti con la prenotazione Expedia.</span></td>
+</tr><tr class="match">
+  <td>39</td>
+  <td class="status">✅</td>
+  <td>06/01/2026</td>
+  <td class="description">EG*TRVL73462895481683   0269430760</td>
+  <td class="amount">143,78</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">998 26 312</span><span class="detail">04/06/2026 — 284 NOVOTEL MILAN M DIGIACOMO MATTEO</span><span class="llm-confidence llm-confidence-alto">Affidabilità: Alto</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Match univoco: hotel Novotel e ospite DIGIACOMO/MATTEO corrispondono chiaramente alla prenotazione Expedia.</span></td>
+</tr><tr class="match">
+  <td>40</td>
+  <td class="status">✅</td>
+  <td>06/01/2026</td>
+  <td class="description">EG*TRVL73462919063092   0269430760</td>
+  <td class="amount">245,64</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">PRT 26 628</span><span class="detail">25/09/2026 — EXPEDIA INC.    FARES ALESSANDRO</span><span class="llm-confidence llm-confidence-medio">Affidabilità: Medio</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Match sul cognome/nome ospite con riga Expedia INC.; importo e data non coincidono con la transazione, quindi corrispondenza probabile ma non certa.</span></td>
+</tr><tr class="no-match">
+  <td>41</td>
+  <td class="status">❌</td>
+  <td>06/01/2026</td>
+  <td class="description">FEDEX159171906 FEDEX EX SEGRATE</td>
+  <td class="amount">29,72</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>42</td>
+  <td class="status">❌</td>
+  <td>06/01/2026</td>
+  <td class="description">GOOGLE*WORKSPACE MAEVIA CC GOOGLE.COM</td>
+  <td class="amount">474,34</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>43</td>
+  <td class="status">❌</td>
+  <td>06/01/2026</td>
+  <td class="description">TRENITALIA WEB AGENCY   ROMA</td>
+  <td class="amount">89,90</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>44</td>
+  <td class="status">❌</td>
+  <td>05/31/2026</td>
+  <td class="description">CIVITATIS TOURS 524505  MADRID</td>
+  <td class="amount">158,40</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="match">
+  <td>45</td>
+  <td class="status">✅</td>
+  <td>05/30/2026</td>
+  <td class="description">EG*TRVL73428468900203   0269430760</td>
+  <td class="amount">90,00</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">998 26 301</span><span class="detail">26/05/2026 — 382 SUNRISE HOTEL   TESONE/MARIO</span><span class="llm-confidence llm-confidence-basso">Affidabilità: Basso</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Importo e data coincidono con una riga hotel Expedia, ma il gestionale riporta un hotel diverso e un altro nominativo; nessuna corrispondenza chiara.</span></td>
+</tr><tr class="no-match">
+  <td>46</td>
+  <td class="status">❌</td>
+  <td>05/29/2026</td>
+  <td class="description">ALLIANZ GLOBAL ASSISTAN ITALY</td>
+  <td class="amount">-639,00</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="match">
+  <td>47</td>
+  <td class="status">✅</td>
+  <td>05/29/2026</td>
+  <td class="description">EG*TRVL73460442203895   0269430760</td>
+  <td class="amount">1.107,73</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">998 26 310</span><span class="detail">06/06/2026 — 873 DAYS INN BY WYN FERRARA MASSIMO</span><span class="llm-confidence llm-confidence-alto">Affidabilità: Alto</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Match univoco: stessa data/importo coerenti e descrizione SIAP con Days Inn e FERRARA MASSIMO.</span></td>
+</tr><tr class="match">
+  <td>48</td>
+  <td class="status">✅</td>
+  <td>05/29/2026</td>
+  <td class="description">EG*TRVL73460591063283   0269430760</td>
+  <td class="amount">3.470,78</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">998 26 299</span><span class="detail">01/06/2026 — 329 EPIC SANA LUAND MIGNINI/ANDREA</span><span class="llm-confidence llm-confidence-alto">Affidabilità: Alto</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Match chiaro su hotel EPIC SANA Luanda e ospite MIGNINI/ANDREA; importo gestionale 3510.00 coerente con la prenotazione Expedia.</span></td>
+</tr><tr class="match">
+  <td>49</td>
+  <td class="status">✅</td>
+  <td>05/29/2026</td>
+  <td class="description">EG*TRVL73460600655492   0269430760</td>
+  <td class="amount">5.799,26</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">998 26 300</span><span class="detail">01/06/2026 — 329 EPIC SANA LUAND DEMARCO MAURO</span><span class="llm-confidence llm-confidence-alto">Affidabilità: Alto</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Hotel e ospite coincidono chiaramente con la riga 998 26 300; importo molto vicino e descrizione coerente con EPIC SANA Luanda.</span></td>
+</tr><tr class="match">
+  <td>50</td>
+  <td class="status">✅</td>
+  <td>05/29/2026</td>
+  <td class="description">EG*TRVL73460654158249   0269430760</td>
+  <td class="amount">3.839,84</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">998 26 311</span><span class="detail">05/06/2026 — 329 EPIC SANA LUAND DIGIACOMO MATTEO</span><span class="llm-confidence llm-confidence-alto">Affidabilità: Alto</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Match univoco su hotel EPIC SANA LUANDA e ospite DIGIACOMO/MATTEO; importo e data coerenti con la prenotazione Expedia.</span></td>
+</tr><tr class="match">
+  <td>51</td>
+  <td class="status">✅</td>
+  <td>05/29/2026</td>
+  <td class="description">Eurowings GmbH          Dortmund</td>
+  <td class="amount">394,58</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">BAW 2528 20</span><span class="detail">08/06/2026 — EU  EUROWINGS       MEDEOSSI/CECILIA</span></td>
+</tr><tr class="match">
+  <td>52</td>
+  <td class="status">✅</td>
+  <td>05/29/2026</td>
+  <td class="description">FLIXBUS.COM             MUNICH</td>
+  <td class="amount">42,97</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">AUT 1494 20</span><span class="detail">01/06/2026 — FB  FLIXBUS ITALIA  DEMARCO/MAURO</span></td>
+</tr><tr class="match">
+  <td>53</td>
+  <td class="status">✅</td>
+  <td>05/29/2026</td>
+  <td class="description">FLIXBUS.COM             MUNICH</td>
+  <td class="amount">43,97</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">AUT 1493 20</span><span class="detail">01/06/2026 — FB  FLIXBUS ITALIA  MIGNINI/ANDREA</span></td>
+</tr><tr class="match">
+  <td>54</td>
+  <td class="status">✅</td>
+  <td>05/29/2026</td>
+  <td class="description">RYANAIR LTD AIRLINE     DUBLIN</td>
+  <td class="amount">115,16</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">LOW 8807 20</span><span class="detail">13/06/2026 — RYA RYANAIR         PARTACZ DANUTA MARIO</span></td>
+</tr><tr class="no-match">
+  <td>55</td>
+  <td class="status">❌</td>
+  <td>05/29/2026</td>
+  <td class="description">USCUSTOMS ESTA APPL PMT INDIANAPOLIS</td>
+  <td class="amount">35,51</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="match">
+  <td>56</td>
+  <td class="status">✅</td>
+  <td>05/29/2026</td>
+  <td class="description">VUELING AIRLINES SA     VILADECANS</td>
+  <td class="amount">610,43</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">BAW 2529 20</span><span class="detail">12/08/2026 — RYA RYANAIR         PALMISIO JONNY</span></td>
+</tr><tr class="no-match">
+  <td>57</td>
+  <td class="status">❌</td>
+  <td>05/28/2026</td>
+  <td class="description">CIVITATIS TOURS 524505  MADRID</td>
+  <td class="amount">39,60</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="match">
+  <td>58</td>
+  <td class="status">✅</td>
+  <td>05/28/2026</td>
+  <td class="description">EG*TRVL73442472995436   0269430760</td>
+  <td class="amount">508,98</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">998 26 294</span><span class="detail">10/06/2026 — 381 THREE CORNERS H DEASCENTIIS/ARIANNA</span><span class="llm-confidence llm-confidence-basso">Affidabilità: Basso</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Importo e data non coincidono con le righe Expedia/gestionale disponibili; nessuna riga SIAP mostra chiaramente questo hotel o l’ospite, quindi match non affidabile.</span></td>
+</tr><tr class="match">
+  <td>59</td>
+  <td class="status">✅</td>
+  <td>05/28/2026</td>
+  <td class="description">EG*TRVL73459608089487   0269430760</td>
+  <td class="amount">207,02</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">998 26 309</span><span class="detail">04/06/2026 — 598 BEST WESTERN HO ALTIERI LEONARDOALES</span><span class="llm-confidence llm-confidence-alto">Affidabilità: Alto</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Match chiaro su hotel Best Western e ospite ALTIERI; importo 215.00 vicino alla transazione Expedia collegata.</span></td>
+</tr><tr class="match">
+  <td>60</td>
+  <td class="status">✅</td>
+  <td>05/28/2026</td>
+  <td class="description">EG*TRVL73459772818492   0269430760</td>
+  <td class="amount">415,02</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">998 26 308</span><span class="detail">04/06/2026 — 598 BEST WESTERN HO MALIZIA MARCO</span><span class="llm-confidence llm-confidence-alto">Affidabilità: Alto</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Hotel e ospite coincidono chiaramente con la riga SIAP 998 26 308; importo e data sono coerenti.</span></td>
+</tr><tr class="match">
+  <td>61</td>
+  <td class="status">✅</td>
+  <td>05/28/2026</td>
+  <td class="description">RYANAIR LTD AIRLINE     DUBLIN</td>
+  <td class="amount">402,42</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">LOW 8806 20</span><span class="detail">03/06/2026 — RYA RYANAIR         MAINI/MASSIMO</span></td>
+</tr><tr class="no-match">
+  <td>62</td>
+  <td class="status">❌</td>
+  <td>05/28/2026</td>
+  <td class="description">TRENITALIA WEB AGENCY   ROMA</td>
+  <td class="amount">99,80</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>63</td>
+  <td class="status">❌</td>
+  <td>05/28/2026</td>
+  <td class="description">VODAFONE PAGAM BOLLETTE IVREA</td>
+  <td class="amount">1.580,30</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>64</td>
+  <td class="status">❌</td>
+  <td>05/27/2026</td>
+  <td class="description">CIVITATIS TOURS 524505  MADRID</td>
+  <td class="amount">65,70</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="match">
+  <td>65</td>
+  <td class="status">✅</td>
+  <td>05/27/2026</td>
+  <td class="description">EG*TRVL73458967398688   0269430760</td>
+  <td class="amount">626,42</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">998 26 307</span><span class="detail">01/06/2026 — 909 IBIS MARSEILLE  AMATUCCI ROBERTO</span><span class="llm-confidence llm-confidence-alto">Affidabilità: Alto</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Match univoco: hotel e ospite coincidono chiaramente con la riga 998 26 307, importo coerente con la prenotazione Expedia.</span></td>
+</tr><tr class="match">
+  <td>66</td>
+  <td class="status">✅</td>
+  <td>05/27/2026</td>
+  <td class="description">MARCHESUD.CDO.ORG       PORTO SAN GIORG</td>
+  <td class="amount">600,00</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">998 26 304</span><span class="detail">16/06/2026 — 384 JW MARRIOTT SUR CAVALLARO DANILO</span></td>
+</tr><tr class="match">
+  <td>67</td>
+  <td class="status">✅</td>
+  <td>05/27/2026</td>
+  <td class="description">NTV TRAVELPORT          ROMA</td>
+  <td class="amount">103,46</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">BF 2697 20</span><span class="detail">11/06/2026 — NTV ITALO           ZANLARI/ANGELO</span></td>
+</tr><tr class="no-match">
+  <td>68</td>
+  <td class="status">❌</td>
+  <td>05/27/2026</td>
+  <td class="description">RYANAIR LTD AIRLINE     DUBLIN</td>
+  <td class="amount">134,00</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="match">
+  <td>69</td>
+  <td class="status">✅</td>
+  <td>05/27/2026</td>
+  <td class="description">RYANAIR LTD AIRLINE     DUBLIN</td>
+  <td class="amount">193,37</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">LOW 8810 20</span><span class="detail">01/06/2026 — RYA RYANAIR         AMATUCCI/ROBERTO</span></td>
+</tr><tr class="no-match">
+  <td>70</td>
+  <td class="status">❌</td>
+  <td>05/27/2026</td>
+  <td class="description">RYANAIR LTD AIRLINE     DUBLIN</td>
+  <td class="amount">242,96</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>71</td>
+  <td class="status">❌</td>
+  <td>05/27/2026</td>
+  <td class="description">STANSTED EXPRESS        ESSEX</td>
+  <td class="amount">112,64</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>72</td>
+  <td class="status">❌</td>
+  <td>05/27/2026</td>
+  <td class="description">TRENITALIA WEB AGENCY   ROMA</td>
+  <td class="amount">160,60</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>73</td>
+  <td class="status">❌</td>
+  <td>05/27/2026</td>
+  <td class="description">WESTMINSTER ABBEY 2     LONDON</td>
+  <td class="amount">73,67</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>74</td>
+  <td class="status">❌</td>
+  <td>05/27/2026</td>
+  <td class="description">mscbook.it              Paris</td>
+  <td class="amount">78,15</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>75</td>
+  <td class="status">❌</td>
+  <td>05/27/2026</td>
+  <td class="description">mscbook.it              Paris</td>
+  <td class="amount">110,00</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>76</td>
+  <td class="status">❌</td>
+  <td>05/26/2026</td>
+  <td class="description">ADDEBITO IN C/C SALVO BUON FINE</td>
+  <td class="amount">-89.709,85</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>77</td>
+  <td class="status">❌</td>
+  <td>05/26/2026</td>
+  <td class="description">CIVITATIS TOURS 524505  MADRID</td>
+  <td class="amount">106,20</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="match">
+  <td>78</td>
+  <td class="status">✅</td>
+  <td>05/26/2026</td>
+  <td class="description">EASYJET                 LUTON</td>
+  <td class="amount">236,64</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">LOW 8809 20</span><span class="detail">01/06/2026 — EAS EASY JET        BIFFI/FRANCESCO</span></td>
+</tr><tr class="match">
+  <td>79</td>
+  <td class="status">✅</td>
+  <td>05/26/2026</td>
+  <td class="description">EG*TRVL73458147948664   0269430760</td>
+  <td class="amount">84,11</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">998 26 301</span><span class="detail">26/05/2026 — 382 SUNRISE HOTEL   TESONE/MARIO</span><span class="llm-confidence llm-confidence-alto">Affidabilità: Alto</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Match univoco su hotel e ospite; importo gestionale 90.00 vicino al pagamento Expedia 84.11, con lieve scostamento plausibile.</span></td>
+</tr><tr class="match">
+  <td>80</td>
+  <td class="status">✅</td>
+  <td>05/26/2026</td>
+  <td class="description">EG*TRVL73458248722091   0269430760</td>
+  <td class="amount">64,83</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">998 26 302</span><span class="detail">30/05/2026 — 261 SWISS-BELINN AI CAVALLARO DANILO</span><span class="llm-confidence llm-confidence-alto">Affidabilità: Alto</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Match univoco su ospite CAVALLARO/DANILO e hotel Swiss-Belinn; importo 85.00 vicino alla prenotazione Expedia.</span></td>
+</tr><tr class="match">
+  <td>81</td>
+  <td class="status">✅</td>
+  <td>05/26/2026</td>
+  <td class="description">EG*TRVL73458252825686   0269430760</td>
+  <td class="amount">1.010,24</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">998 26 303</span><span class="detail">31/05/2026 — 383 BARCELO  MUSSAN CAVALLARO DANILO</span><span class="llm-confidence llm-confidence-alto">Affidabilità: Alto</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Match univoco: stessa data/ospite e importo gestionale coerente con la prenotazione Expedia, hotel chiaramente corrispondente.</span></td>
+</tr><tr class="match">
+  <td>82</td>
+  <td class="status">✅</td>
+  <td>05/26/2026</td>
+  <td class="description">EG*TRVL73458255580809   0269430760</td>
+  <td class="amount">450,59</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">998 26 304</span><span class="detail">16/06/2026 — 384 JW MARRIOTT SUR CAVALLARO DANILO</span><span class="llm-confidence llm-confidence-alto">Affidabilità: Alto</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Match univoco su ospite CAVALLARO/DANILO e hotel JW Marriott Surabaya; importo e data coerenti.</span></td>
+</tr><tr class="match">
+  <td>83</td>
+  <td class="status">✅</td>
+  <td>05/26/2026</td>
+  <td class="description">EG*TRVL73458282621064   0269430760</td>
+  <td class="amount">453,58</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">998 26 305</span><span class="detail">31/05/2026 — 298 HILTON GARDEN I LAZZERI ALESSANDRO</span><span class="llm-confidence llm-confidence-alto">Affidabilità: Alto</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Match univoco: importo 453.58 vicino alla riga Hilton Garden I / LAZZERI ALESSANDRO da 288.00, ma la corrispondenza migliore per ospite e hotel è questa; tuttavia l'importo non coincide, quindi affidabilità ridotta.</span></td>
+</tr><tr class="no-match">
+  <td>84</td>
+  <td class="status">❌</td>
+  <td>05/26/2026</td>
+  <td class="description">GARUDA INDONESI*cfe3f17 JAKARTA BARAT</td>
+  <td class="amount">105,38</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>85</td>
+  <td class="status">❌</td>
+  <td>05/26/2026</td>
+  <td class="description">OMAN AIR (S.A.O.C) WWW. ITALY</td>
+  <td class="amount">413,93</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>86</td>
+  <td class="status">❌</td>
+  <td>05/26/2026</td>
+  <td class="description">OMAN AIR (S.A.O.C) WWW. ITALY</td>
+  <td class="amount">455,27</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>87</td>
+  <td class="status">❌</td>
+  <td>05/26/2026</td>
+  <td class="description">OMAN AIR (S.A.O.C) WWW. ITALY</td>
+  <td class="amount">455,27</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="match">
+  <td>88</td>
+  <td class="status">✅</td>
+  <td>05/26/2026</td>
+  <td class="description">RYANAIR LTD AIRLINE     DUBLIN</td>
+  <td class="amount">83,18</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">LOW 8808 20</span><span class="detail">03/06/2026 — RYA RYANAIR         SCHIRALDI/CLAUDIO</span></td>
+</tr><tr class="no-match">
+  <td>89</td>
+  <td class="status">❌</td>
+  <td>05/26/2026</td>
+  <td class="description">RYANAIR LTD AIRLINE     DUBLIN</td>
+  <td class="amount">193,72</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="match">
+  <td>90</td>
+  <td class="status">✅</td>
+  <td>05/26/2026</td>
+  <td class="description">TRENITALIA WEB AGENCY   ROMA</td>
+  <td class="amount">26,60</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">BF 2605260004 20</span><span class="detail">02/06/2026 — TRE TRENITALIA      DI CONCETTO/ANTONELL</span></td>
+</tr><tr class="no-match">
+  <td>91</td>
+  <td class="status">❌</td>
+  <td>05/26/2026</td>
+  <td class="description">TRENITALIA WEB AGENCY   ROMA</td>
+  <td class="amount">94,00</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>92</td>
+  <td class="status">❌</td>
+  <td>05/26/2026</td>
+  <td class="description">mscbook.it              Paris</td>
+  <td class="amount">1.720,24</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>93</td>
+  <td class="status">❌</td>
+  <td>05/26/2026</td>
+  <td class="description">mscbook.it              Paris</td>
+  <td class="amount">1.759,32</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>94</td>
+  <td class="status">❌</td>
+  <td>05/25/2026</td>
+  <td class="description">CIVITATIS TOURS 524505  MADRID</td>
+  <td class="amount">178,20</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>95</td>
+  <td class="status">❌</td>
+  <td>05/25/2026</td>
+  <td class="description">CIVITATIS TOURS 524505  MADRID</td>
+  <td class="amount">178,20</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>96</td>
+  <td class="status">❌</td>
+  <td>05/25/2026</td>
+  <td class="description">RYANAIR LTD AIRLINE     DUBLIN</td>
+  <td class="amount">170,00</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="match">
+  <td>97</td>
+  <td class="status">✅</td>
+  <td>05/25/2026</td>
+  <td class="description">TRENITALIA WEB AGENCY   ROMA</td>
+  <td class="amount">47,00</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">BF 2605260001 20</span><span class="detail">15/06/2026 — TRE TRENITALIA      RIPANI/MAURO</span></td>
+</tr><tr class="no-match">
+  <td>98</td>
+  <td class="status">❌</td>
+  <td>05/25/2026</td>
+  <td class="description">UNITED AIRLINES UNITED  UNITED STATES</td>
+  <td class="amount">53,99</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>99</td>
+  <td class="status">❌</td>
+  <td>05/25/2026</td>
+  <td class="description">WIZZ AIR MALTA LIMITED  VALETTA</td>
+  <td class="amount">226,27</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>100</td>
+  <td class="status">❌</td>
+  <td>05/24/2026</td>
+  <td class="description">CIVITATIS TOURS 524505  MADRID</td>
+  <td class="amount">176,40</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="match">
+  <td>101</td>
+  <td class="status">✅</td>
+  <td>05/24/2026</td>
+  <td class="description">TRENITALIA WEB AGENCY   ROMA</td>
+  <td class="amount">6,00</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">BF 2605240001 20</span><span class="detail">24/05/2026 — TRE TRENITALIA      VERDOLINI/ROBERTA</span></td>
+</tr><tr class="no-match">
+  <td>102</td>
+  <td class="status">❌</td>
+  <td>05/23/2026</td>
+  <td class="description">CIVITATIS TOURS 524505  MADRID</td>
+  <td class="amount">72,00</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>103</td>
+  <td class="status">❌</td>
+  <td>05/22/2026</td>
+  <td class="description">ALLIANZ GLOBAL ASSISTAN ITALY</td>
+  <td class="amount">607,05</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>104</td>
+  <td class="status">❌</td>
+  <td>05/22/2026</td>
+  <td class="description">ALLIANZ GLOBAL ASSISTAN ITALY</td>
+  <td class="amount">639,00</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="match">
+  <td>105</td>
+  <td class="status">✅</td>
+  <td>05/22/2026</td>
+  <td class="description">EG*TRVL73455308736400   0269430760</td>
+  <td class="amount">189,60</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">998 26 292</span><span class="detail">08/06/2026 — 612 VAN DER VALK HO DEASCENTIIS/ARIANNA</span><span class="llm-confidence llm-confidence-alto">Affidabilità: Alto</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Match univoco su ospite DEASCENTIIS/ARIANNA e hotel Van der Valk; importo e data coerenti con la prenotazione Expedia.</span></td>
+</tr><tr class="no-match">
+  <td>106</td>
+  <td class="status">❌</td>
+  <td>05/22/2026</td>
+  <td class="description">FEDEX159106284 FEDEX EX SEGRATE</td>
+  <td class="amount">18,18</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>107</td>
+  <td class="status">❌</td>
+  <td>05/22/2026</td>
+  <td class="description">RYANAIR LTD AIRLINE     DUBLIN</td>
+  <td class="amount">393,32</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="match">
+  <td>108</td>
+  <td class="status">✅</td>
+  <td>05/22/2026</td>
+  <td class="description">TRENITALIA WEB AGENCY   ROMA</td>
+  <td class="amount">66,00</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">BF 2605220001 20</span><span class="detail">24/05/2026 — TRE TRENITALIA      VERDOLINI/ROBERTA</span></td>
+</tr><tr class="no-match">
+  <td>109</td>
+  <td class="status">❌</td>
+  <td>05/22/2026</td>
+  <td class="description">TRENITALIA WEB AGENCY   ROMA</td>
+  <td class="amount">155,80</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>110</td>
+  <td class="status">❌</td>
+  <td>05/22/2026</td>
+  <td class="description">TRENITALIA WEB AGENCY   ROMA</td>
+  <td class="amount">169,80</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>111</td>
+  <td class="status">❌</td>
+  <td>05/22/2026</td>
+  <td class="description">TRENITALIA WEB AGENCY   ROMA</td>
+  <td class="amount">264,00</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="match">
+  <td>112</td>
+  <td class="status">✅</td>
+  <td>05/21/2026</td>
+  <td class="description">EG*TRVL73454437762042   0269430760</td>
+  <td class="amount">197,00</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">998 26 291</span><span class="detail">21/05/2026 — 186 MOXY MILAN LINA CARASSAI/LUCA</span><span class="llm-confidence llm-confidence-alto">Affidabilità: Alto</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Match univoco su hotel e ospite; importo SIAP 220.00 coerente con pagamento Expedia 197.00 con possibile differenza di commissioni/arrotondamenti.</span></td>
+</tr><tr class="match">
+  <td>113</td>
+  <td class="status">✅</td>
+  <td>05/21/2026</td>
+  <td class="description">EG*TRVL73454470036636   0269430760</td>
+  <td class="amount">168,75</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">998 26 312</span><span class="detail">04/06/2026 — 284 NOVOTEL MILAN M DIGIACOMO MATTEO</span><span class="llm-confidence llm-confidence-basso">Affidabilità: Basso</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Unico match Expedia plausibile per hotel e importo vicino, ma la riga SIAP riporta Novotel Milano e un ospite diverso; corrispondenza debole.</span></td>
+</tr><tr class="no-match">
+  <td>114</td>
+  <td class="status">❌</td>
+  <td>05/21/2026</td>
+  <td class="description">MSC Cruises Italy       Paris</td>
+  <td class="amount">95,00</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="match">
+  <td>115</td>
+  <td class="status">✅</td>
+  <td>05/21/2026</td>
+  <td class="description">RYANAIR LTD AIRLINE     DUBLIN</td>
+  <td class="amount">48,38</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">LOW 8798 20</span><span class="detail">10/06/2026 — RYA RYANAIR         DEASCENTIIS/ARIANNA</span></td>
+</tr><tr class="no-match">
+  <td>116</td>
+  <td class="status">❌</td>
+  <td>05/21/2026</td>
+  <td class="description">RYANAIR LTD AIRLINE     DUBLIN</td>
+  <td class="amount">562,60</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="match">
+  <td>117</td>
+  <td class="status">✅</td>
+  <td>05/21/2026</td>
+  <td class="description">RYANAIR LTD AIRLINE     DUBLIN</td>
+  <td class="amount">6.689,60</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">LOW 8799 20</span><span class="detail">10/11/2026 — RYA RYANAIR         GRP</span></td>
+</tr><tr class="match">
+  <td>118</td>
+  <td class="status">✅</td>
+  <td>05/20/2026</td>
+  <td class="description">EG*TRVL73440368950869   0269430760</td>
+  <td class="amount">749,12</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">PRT 26 636</span><span class="detail">07/06/2026 — EXPEDIA INC.    ODDI ANDREA</span><span class="llm-confidence llm-confidence-medio">Affidabilità: Medio</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Match su Expedia INC. con importo e data compatibili; hotel/ospite non compaiono in SIAP, quindi corrispondenza probabile ma non univoca.</span></td>
+</tr><tr class="no-match">
+  <td>119</td>
+  <td class="status">❌</td>
+  <td>05/20/2026</td>
+  <td class="description">EG*TRVL73453902634249   0269430760</td>
+  <td class="amount">-224,36</td>
+  <td class="status-text">Nessun match</td>
+  <td><span class="llm-confidence llm-confidence-basso">Affidabilità: Basso</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Nessuna riga SIAP compatibile per data/importo/nome; le righe Expedia presenti non corrispondono alla prenotazione da 224,36 del 20/05/26.</span></td>
+</tr><tr class="no-match">
+  <td>120</td>
+  <td class="status">❌</td>
+  <td>05/20/2026</td>
+  <td class="description">EG*TRVL73453902634249   0269430760</td>
+  <td class="amount">-224,36</td>
+  <td class="status-text">Nessun match</td>
+  <td><span class="llm-confidence llm-confidence-basso">Affidabilità: Basso</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Nessuna riga SIAP compatibile per data/importo/nome; le righe Expedia presenti non corrispondono alla prenotazione da 224,36 del 20/05/26.</span></td>
+</tr><tr class="no-match">
+  <td>121</td>
+  <td class="status">❌</td>
+  <td>05/20/2026</td>
+  <td class="description">EG*TRVL73453902634249   0269430760</td>
+  <td class="amount">-224,36</td>
+  <td class="status-text">Nessun match</td>
+  <td><span class="llm-confidence llm-confidence-basso">Affidabilità: Basso</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Nessuna riga SIAP compatibile per data/importo/nome; le righe Expedia presenti non corrispondono alla prenotazione da 224,36 del 20/05/26.</span></td>
+</tr><tr class="no-match">
+  <td>122</td>
+  <td class="status">❌</td>
+  <td>05/20/2026</td>
+  <td class="description">EG*TRVL73453902634249   0269430760</td>
+  <td class="amount">-224,36</td>
+  <td class="status-text">Nessun match</td>
+  <td><span class="llm-confidence llm-confidence-basso">Affidabilità: Basso</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Nessuna riga SIAP compatibile per data/importo/nome; le righe Expedia presenti non corrispondono alla prenotazione da 224,36 del 20/05/26.</span></td>
+</tr><tr class="no-match">
+  <td>123</td>
+  <td class="status">❌</td>
+  <td>05/20/2026</td>
+  <td class="description">EG*TRVL73453902634249   0269430760</td>
+  <td class="amount">-224,36</td>
+  <td class="status-text">Nessun match</td>
+  <td><span class="llm-confidence llm-confidence-basso">Affidabilità: Basso</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Nessuna riga SIAP compatibile per data/importo/nome; le righe Expedia presenti non corrispondono alla prenotazione da 224,36 del 20/05/26.</span></td>
+</tr><tr class="no-match">
+  <td>124</td>
+  <td class="status">❌</td>
+  <td>05/20/2026</td>
+  <td class="description">EG*TRVL73453902634249   0269430760</td>
+  <td class="amount">-224,36</td>
+  <td class="status-text">Nessun match</td>
+  <td><span class="llm-confidence llm-confidence-basso">Affidabilità: Basso</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Nessuna riga SIAP compatibile per data/importo/nome; le righe Expedia presenti non corrispondono alla prenotazione da 224,36 del 20/05/26.</span></td>
+</tr><tr class="match">
+  <td>125</td>
+  <td class="status">✅</td>
+  <td>05/20/2026</td>
+  <td class="description">EG*TRVL73453902634249   0269430760</td>
+  <td class="amount">1.346,16</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">998 26 294</span><span class="detail">10/06/2026 — 381 THREE CORNERS H DEASCENTIIS/ARIANNA</span><span class="llm-confidence llm-confidence-basso">Affidabilità: Basso</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Nessuna riga con ospite/hotel corrispondenti; la sola corrispondenza è l'importo simile a una prenotazione Expedia, ma non coincide con data o nominativo.</span></td>
+</tr><tr class="no-match">
+  <td>126</td>
+  <td class="status">❌</td>
+  <td>05/20/2026</td>
+  <td class="description">TRENITALIA WEB AGENCY   ROMA</td>
+  <td class="amount">86,00</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>127</td>
+  <td class="status">❌</td>
+  <td>05/20/2026</td>
+  <td class="description">TRENITALIA WEB AGENCY   ROMA</td>
+  <td class="amount">248,00</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="match">
+  <td>128</td>
+  <td class="status">✅</td>
+  <td>05/20/2026</td>
+  <td class="description">UKVI UKVI               LONDON</td>
+  <td class="amount">23,90</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">BF 2605270001 20</span><span class="detail">09/06/2026 — TRE TRENITALIA      DAGA/LEONARDO</span></td>
+</tr><tr class="no-match">
+  <td>129</td>
+  <td class="status">❌</td>
+  <td>05/20/2026</td>
+  <td class="description">UKVI UKVI               LONDON</td>
+  <td class="amount">23,90</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>130</td>
+  <td class="status">❌</td>
+  <td>05/20/2026</td>
+  <td class="description">UKVI UKVI               LONDON</td>
+  <td class="amount">23,90</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>131</td>
+  <td class="status">❌</td>
+  <td>05/20/2026</td>
+  <td class="description">UKVI UKVI               LONDON</td>
+  <td class="amount">23,90</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>132</td>
+  <td class="status">❌</td>
+  <td>05/19/2026</td>
+  <td class="description">JET2.COM Jet2.com       LEEDS</td>
+  <td class="amount">411,20</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="match">
+  <td>133</td>
+  <td class="status">✅</td>
+  <td>05/18/2026</td>
+  <td class="description">EG*TRVL73452104732448   0269430760</td>
+  <td class="amount">166,49</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">BF 2605180001 20</span><span class="detail">26/05/2026 — TRE TRENITALIA      MONTANINI/ALBERTO</span><span class="llm-confidence llm-confidence-medio">Affidabilità: Medio</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Match sul cognome/nome dell’ospite e importo coerente con una delle righe SIAP; il nome hotel non compare in descrizione, quindi corrispondenza probabile ma non univoca.</span></td>
+</tr><tr class="match">
+  <td>134</td>
+  <td class="status">✅</td>
+  <td>05/18/2026</td>
+  <td class="description">RYANAIR LTD AIRLINE     DUBLIN</td>
+  <td class="amount">57,49</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">LOW 8790 20</span><span class="detail">08/08/2026 — RYA RYANAIR         DEASCENTIIS/ARIANNA</span></td>
+</tr><tr class="match">
+  <td>135</td>
+  <td class="status">✅</td>
+  <td>05/18/2026</td>
+  <td class="description">RYANAIR LTD AIRLINE     DUBLIN</td>
+  <td class="amount">58,78</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">LOW 8793 20</span><span class="detail">12/06/2026 — RYA RYANAIR         DEASCENTIIS/ARIANNA</span></td>
+</tr><tr class="match">
+  <td>136</td>
+  <td class="status">✅</td>
+  <td>05/18/2026</td>
+  <td class="description">RYANAIR LTD AIRLINE     DUBLIN</td>
+  <td class="amount">400,71</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">BAW 2515 20</span><span class="detail">17/07/2026 — RYA RYANAIR         ALESSIO ODDI</span></td>
+</tr><tr class="no-match">
+  <td>137</td>
+  <td class="status">❌</td>
+  <td>05/18/2026</td>
+  <td class="description">TRENITALIA WEB AGENCY   ROMA</td>
+  <td class="amount">-147,20</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>138</td>
+  <td class="status">❌</td>
+  <td>05/18/2026</td>
+  <td class="description">TRENITALIA WEB AGENCY   ROMA</td>
+  <td class="amount">184,00</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>139</td>
+  <td class="status">❌</td>
+  <td>05/18/2026</td>
+  <td class="description">WIZZ AIR HUNGARY KFT    BUDAPEST</td>
+  <td class="amount">50,33</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="match">
+  <td>140</td>
+  <td class="status">✅</td>
+  <td>05/18/2026</td>
+  <td class="description">WIZZ AIR HUNGARY KFT    BUDAPEST</td>
+  <td class="amount">60,14</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">LOW 8791 20</span><span class="detail">10/06/2026 — WIZ WIZZ AIR        DEASCENTIIS/ARIANNA</span></td>
+</tr><tr class="no-match">
+  <td>141</td>
+  <td class="status">❌</td>
+  <td>05/17/2026</td>
+  <td class="description">CIVITATIS TOURS 524505  MADRID</td>
+  <td class="amount">180,00</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>142</td>
+  <td class="status">❌</td>
+  <td>05/15/2026</td>
+  <td class="description">CIVITATIS TOURS 524505  MADRID</td>
+  <td class="amount">280,26</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>143</td>
+  <td class="status">❌</td>
+  <td>05/15/2026</td>
+  <td class="description">EASYJET                 LUTON</td>
+  <td class="amount">338,52</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="match">
+  <td>144</td>
+  <td class="status">✅</td>
+  <td>05/15/2026</td>
+  <td class="description">EG*TRVL73349117266013   0269430760</td>
+  <td class="amount">520,22</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">PRT 26 636</span><span class="detail">07/06/2026 — EXPEDIA INC.    ODDI ANDREA</span><span class="llm-confidence llm-confidence-basso">Affidabilità: Basso</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Unica riga Expedia INC. con importo vicino ma non coincidente (544.54 vs 520.22) e senza riferimento diretto a hotel/ospite; nessun match SIAP chiaro.</span></td>
+</tr><tr class="match">
+  <td>145</td>
+  <td class="status">✅</td>
+  <td>05/15/2026</td>
+  <td class="description">EG*TRVL73449859979045   0269430760</td>
+  <td class="amount">248,12</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">998 26 287</span><span class="detail">09/06/2026 — 030 AKZENT HOTEL JO VERNA /MARCO</span><span class="llm-confidence llm-confidence-alto">Affidabilità: Alto</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Match univoco: hotel e ospite coincidono con la riga 998 26 287, importo coerente con la prenotazione Expedia.</span></td>
+</tr><tr class="match">
+  <td>146</td>
+  <td class="status">✅</td>
+  <td>05/15/2026</td>
+  <td class="description">EG*TRVL73449862872871   0269430760</td>
+  <td class="amount">364,64</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">998 26 289</span><span class="detail">10/06/2026 — 378 ALETTO HOTEL KU VERNA /MARCO</span><span class="llm-confidence llm-confidence-alto">Affidabilità: Alto</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Match univoco con stessa data/ospite e importo coerente; descrizione hotel troncata ma chiaramente corrispondente.</span></td>
+</tr><tr class="match">
+  <td>147</td>
+  <td class="status">✅</td>
+  <td>05/15/2026</td>
+  <td class="description">EG*TRVL73449976131456   0269430760</td>
+  <td class="amount">178,84</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">998 26 332</span><span class="detail">10/06/2026 — 922 IBIS ISTANBUL T SCAVONGELLI CRISTIAN</span><span class="llm-confidence llm-confidence-alto">Affidabilità: Alto</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Hotel e ospite coincidono chiaramente con la riga SIAP 'IBIS ISTANBUL T' e nome TREVISANI/ROBERTO; importo e data sono coerenti.</span></td>
+</tr><tr class="match">
+  <td>148</td>
+  <td class="status">✅</td>
+  <td>05/15/2026</td>
+  <td class="description">EG*TRVL73449991224828   0269430760</td>
+  <td class="amount">449,06</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">PRT 26 636</span><span class="detail">07/06/2026 — EXPEDIA INC.    ODDI ANDREA</span><span class="llm-confidence llm-confidence-alto">Affidabilità: Alto</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Email Expedia vuota; la riga SIAP più coerente con importo/data è PRT 26 636 (544,54) ma senza dettagli email non verificabili.</span></td>
+</tr><tr class="no-match">
+  <td>149</td>
+  <td class="status">❌</td>
+  <td>05/15/2026</td>
+  <td class="description">FEDEX159066436 FEDEX EX SEGRATE</td>
+  <td class="amount">48,30</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>150</td>
+  <td class="status">❌</td>
+  <td>05/15/2026</td>
+  <td class="description">PAYPAL *SOCCOOPSOCI     3459391659</td>
+  <td class="amount">30,60</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="match">
+  <td>151</td>
+  <td class="status">✅</td>
+  <td>05/15/2026</td>
+  <td class="description">PEGASUS PEGASUS         TURKEY</td>
+  <td class="amount">619,93</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">BAW 2513 20</span><span class="detail">19/05/2026 — PC  PEGASUS AIRLINE TREVISANI/ROBERTO</span></td>
+</tr><tr class="match">
+  <td>152</td>
+  <td class="status">✅</td>
+  <td>05/15/2026</td>
+  <td class="description">RYANAIR LTD AIRLINE     DUBLIN</td>
+  <td class="amount">122,99</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">LOW 8794 20</span><span class="detail">12/06/2026 — RYA RYANAIR         VERNA/MARCO</span></td>
+</tr><tr class="match">
+  <td>153</td>
+  <td class="status">✅</td>
+  <td>05/14/2026</td>
+  <td class="description">MYPARKING APP           GENOVA</td>
+  <td class="amount">76,00</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">PRT 26 487</span><span class="detail">05/07/2026 — COM- MEDIA SPA  MENOZZI DANIELA</span></td>
+</tr><tr class="match">
+  <td>154</td>
+  <td class="status">✅</td>
+  <td>05/14/2026</td>
+  <td class="description">PARKINGO                MILANO</td>
+  <td class="amount">69,00</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">ASPP 433 20</span><span class="detail">23/06/2026 — UNA UNITED AIRLINES GENONI/MARCO</span></td>
+</tr><tr class="match">
+  <td>155</td>
+  <td class="status">✅</td>
+  <td>05/14/2026</td>
+  <td class="description">RYANAIR LTD AIRLINE     DUBLIN</td>
+  <td class="amount">97,58</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">LOW 8777 20</span><span class="detail">25/05/2026 — RYA RYANAIR         CINTI/MARIO</span></td>
+</tr><tr class="match">
+  <td>156</td>
+  <td class="status">✅</td>
+  <td>05/14/2026</td>
+  <td class="description">RYANAIR LTD AIRLINE     DUBLIN</td>
+  <td class="amount">130,48</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">LOW 8786 20</span><span class="detail">20/05/2026 — RYA RYANAIR         LANA/IVANO</span></td>
+</tr><tr class="match">
+  <td>157</td>
+  <td class="status">✅</td>
+  <td>05/14/2026</td>
+  <td class="description">RYANAIR LTD AIRLINE     DUBLIN</td>
+  <td class="amount">322,38</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">LOW 8787 20</span><span class="detail">18/05/2026 — RYA RYANAIR         AMATUCCI/ROBERTO</span></td>
+</tr><tr class="no-match">
+  <td>158</td>
+  <td class="status">❌</td>
+  <td>05/14/2026</td>
+  <td class="description">RYANAIR LTD AIRLINE     DUBLIN</td>
+  <td class="amount">525,92</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>159</td>
+  <td class="status">❌</td>
+  <td>05/14/2026</td>
+  <td class="description">RYANAIR LTD AIRLINE     DUBLIN</td>
+  <td class="amount">639,04</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>160</td>
+  <td class="status">❌</td>
+  <td>05/14/2026</td>
+  <td class="description">TRENITALIA WEB AGENCY   ROMA</td>
+  <td class="amount">134,80</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="match">
+  <td>161</td>
+  <td class="status">✅</td>
+  <td>05/14/2026</td>
+  <td class="description">WIZZ AIR HUNGARY KFT    BUDAPEST</td>
+  <td class="amount">114,92</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">BAW 2511 20</span><span class="detail">19/05/2026 — WIZ WIZZ AIR        LANA/IVANO</span></td>
+</tr><tr class="no-match">
+  <td>162</td>
+  <td class="status">❌</td>
+  <td>05/14/2026</td>
+  <td class="description">WIZZ AIR HUNGARY KFT    BUDAPEST</td>
+  <td class="amount">261,03</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="match">
+  <td>163</td>
+  <td class="status">✅</td>
+  <td>05/14/2026</td>
+  <td class="description">WWW.ADR.IT              FIUMICINO</td>
+  <td class="amount">67,90</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">PRT 26 474</span><span class="detail">05/07/2026 — AEROPORTI DI RO PIERMARTIRI DEBORAH</span></td>
+</tr><tr class="match">
+  <td>164</td>
+  <td class="status">✅</td>
+  <td>05/14/2026</td>
+  <td class="description">WWW.ADR.IT              FIUMICINO</td>
+  <td class="amount">107,80</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">PRT 26 488</span><span class="detail">16/05/2026 — AEROPORTI DI RO NASTASI ANTONINO</span></td>
+</tr><tr class="no-match">
+  <td>165</td>
+  <td class="status">❌</td>
+  <td>05/13/2026</td>
+  <td class="description">BIANCO VIAGGI S R L     MILANO</td>
+  <td class="amount">813,67</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>166</td>
+  <td class="status">❌</td>
+  <td>05/13/2026</td>
+  <td class="description">EASYJET                 LUTON</td>
+  <td class="amount">291,94</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="match">
+  <td>167</td>
+  <td class="status">✅</td>
+  <td>05/13/2026</td>
+  <td class="description">NTV TRAVELPORT          ROMA</td>
+  <td class="amount">55,86</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">BF 2694 20</span><span class="detail">18/05/2026 — NTV ITALO           ZANLARI/ANGELO</span></td>
+</tr><tr class="no-match">
+  <td>168</td>
+  <td class="status">❌</td>
+  <td>05/13/2026</td>
+  <td class="description">RYANAIR LTD AIRLINE     DUBLIN</td>
+  <td class="amount">121,38</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>169</td>
+  <td class="status">❌</td>
+  <td>05/13/2026</td>
+  <td class="description">USCUSTOMS ESTA APPL PMT INDIANAPOLIS</td>
+  <td class="amount">35,29</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>170</td>
+  <td class="status">❌</td>
+  <td>05/13/2026</td>
+  <td class="description">USCUSTOMS ESTA APPL PMT INDIANAPOLIS</td>
+  <td class="amount">35,29</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>171</td>
+  <td class="status">❌</td>
+  <td>05/13/2026</td>
+  <td class="description">USCUSTOMS ESTA APPL PMT INDIANAPOLIS</td>
+  <td class="amount">35,29</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>172</td>
+  <td class="status">❌</td>
+  <td>05/12/2026</td>
+  <td class="description">EASYJET                 LUTON</td>
+  <td class="amount">114,50</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="match">
+  <td>173</td>
+  <td class="status">✅</td>
+  <td>05/12/2026</td>
+  <td class="description">EG*TRVL73447510180040   0269430760</td>
+  <td class="amount">181,18</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">998 26 281</span><span class="detail">19/05/2026 — 594 AS HOTEL LIMBIA CHIAPPINI MICHELE</span><span class="llm-confidence llm-confidence-alto">Affidabilità: Alto</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Match diretto su hotel e ospite; importo SIAP 182.00 molto vicino alla transazione 181.18.</span></td>
+</tr><tr class="match">
+  <td>174</td>
+  <td class="status">✅</td>
+  <td>05/12/2026</td>
+  <td class="description">EG*TRVL73447514514673   0269430760</td>
+  <td class="amount">2.309,14</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">998 26 282</span><span class="detail">13/05/2026 — 375 THE RITZ-CARLTO QORRI DENIS</span><span class="llm-confidence llm-confidence-alto">Affidabilità: Alto</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Match univoco: stessa ospite QORRI DENIS e importo coerente con la prenotazione Expedia del Ritz-Carlton.</span></td>
+</tr><tr class="match">
+  <td>175</td>
+  <td class="status">✅</td>
+  <td>05/12/2026</td>
+  <td class="description">EG*TRVL73447531366808   0269430760</td>
+  <td class="amount">459,00</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">998 26 283</span><span class="detail">26/05/2026 — 376 MOVENPICK HOTEL SANTARELLI RAFFAELLA</span><span class="llm-confidence llm-confidence-alto">Affidabilità: Alto</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Riga SIAP con hotel Mövenpick/Movenpick e ospite SANTARELLI RAFFAELLA; importo coerente con prenotazione Expedia.</span></td>
+</tr><tr class="match">
+  <td>176</td>
+  <td class="status">✅</td>
+  <td>05/12/2026</td>
+  <td class="description">RYANAIR LTD AIRLINE     DUBLIN</td>
+  <td class="amount">110,69</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">LOW 8774 20</span><span class="detail">29/05/2026 — RYA RYANAIR         SANTARELLI/RAFFAELLA</span></td>
+</tr><tr class="no-match">
+  <td>177</td>
+  <td class="status">❌</td>
+  <td>05/12/2026</td>
+  <td class="description">RYANAIR LTD AIRLINE     DUBLIN</td>
+  <td class="amount">464,84</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="match">
+  <td>178</td>
+  <td class="status">✅</td>
+  <td>05/12/2026</td>
+  <td class="description">TRENITALIA WEB AGENCY   ROMA</td>
+  <td class="amount">71,00</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">BF 2605120005 20</span><span class="detail">14/05/2026 — TRE TRENITALIA      SASSETTI/DAVIDE</span></td>
+</tr><tr class="no-match">
+  <td>179</td>
+  <td class="status">❌</td>
+  <td>05/12/2026</td>
+  <td class="description">WIZZ AIR HUNGARY KFT    BUDAPEST</td>
+  <td class="amount">55,02</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="match">
+  <td>180</td>
+  <td class="status">✅</td>
+  <td>05/12/2026</td>
+  <td class="description">WIZZ AIR HUNGARY KFT    BUDAPEST</td>
+  <td class="amount">213,59</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">LOW 8775 20</span><span class="detail">26/05/2026 — WIZ WIZZ AIR        SANTARELLI/RAFFAELLA</span></td>
+</tr><tr class="no-match">
+  <td>181</td>
+  <td class="status">❌</td>
+  <td>05/12/2026</td>
+  <td class="description">WWW.AUTOEUROPE.DE       MUNICH</td>
+  <td class="amount">360,41</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>182</td>
+  <td class="status">❌</td>
+  <td>05/12/2026</td>
+  <td class="description">mscbook.it              Paris</td>
+  <td class="amount">1.232,53</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>183</td>
+  <td class="status">❌</td>
+  <td>05/11/2026</td>
+  <td class="description">EDENRED                 MILANO</td>
+  <td class="amount">1.859,60</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="match">
+  <td>184</td>
+  <td class="status">✅</td>
+  <td>05/11/2026</td>
+  <td class="description">EG*TRVL73446659358098   0269430760</td>
+  <td class="amount">201,43</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">PRT 26 457</span><span class="detail">16/05/2026 — EXPEDIA INC.    AMADIO GIUSEPPINA</span><span class="llm-confidence llm-confidence-alto">Affidabilità: Alto</span><span class="llm-reason"><span class="llm-reason-label">Motivazione LLM:</span> Riga Expedia INC. con stesso ospite AMADIO GIUSEPPINA e importo coerente; match univoco.</span></td>
+</tr><tr class="match">
+  <td>185</td>
+  <td class="status">✅</td>
+  <td>05/11/2026</td>
+  <td class="description">EMIRATES RCA FDWWE2 11M PARIS</td>
+  <td class="amount">298,00</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">UPGP 1007 20</span><span class="detail">12/05/2026 — EKW EMIRATES WEB    BIFFI/FRANCESCO</span></td>
+</tr><tr class="match">
+  <td>186</td>
+  <td class="status">✅</td>
+  <td>05/11/2026</td>
+  <td class="description">TRENITALIA WEB AGENCY   ROMA</td>
+  <td class="amount">49,42</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">BF 2605110001 20</span><span class="detail">19/05/2026 — TRE TRENITALIA      FORLI/CELESTE</span></td>
+</tr><tr class="no-match">
+  <td>187</td>
+  <td class="status">❌</td>
+  <td>05/11/2026</td>
+  <td class="description">TRENITALIA WEB AGENCY   ROMA</td>
+  <td class="amount">185,40</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>188</td>
+  <td class="status">❌</td>
+  <td>05/11/2026</td>
+  <td class="description">TRENITALIA WEB AGENCY   ROMA</td>
+  <td class="amount">193,58</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="match">
+  <td>189</td>
+  <td class="status">✅</td>
+  <td>05/11/2026</td>
+  <td class="description">TURKISH AIRLINES TURKIS UNITED KINGDOM</td>
+  <td class="amount">670,76</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">BAW 2510 20</span><span class="detail">25/05/2026 — TKW TURKISH WEB     LISNICHIY SERGEY</span></td>
+</tr><tr class="no-match">
+  <td>190</td>
+  <td class="status">❌</td>
+  <td>05/09/2026</td>
+  <td class="description">TIM RINNOVO OFFERTA     ROMA</td>
+  <td class="amount">16,48</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>191</td>
+  <td class="status">❌</td>
+  <td>05/08/2026</td>
+  <td class="description">FEDEX159031803 FEDEX EX SEGRATE</td>
+  <td class="amount">51,57</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="match">
+  <td>192</td>
+  <td class="status">✅</td>
+  <td>05/08/2026</td>
+  <td class="description">FLIXBUS.COM             MUNICH</td>
+  <td class="amount">23,98</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">AUT 1486 20</span><span class="detail">16/05/2026 — FB  FLIXBUS ITALIA  DEMARCO/MAURO</span></td>
+</tr><tr class="no-match">
+  <td>193</td>
+  <td class="status">❌</td>
+  <td>05/08/2026</td>
+  <td class="description">PARKINGO                MILANO</td>
+  <td class="amount">91,50</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>194</td>
+  <td class="status">❌</td>
+  <td>05/08/2026</td>
+  <td class="description">RYANAIR LTD AIRLINE     DUBLIN</td>
+  <td class="amount">553,36</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>195</td>
+  <td class="status">❌</td>
+  <td>05/08/2026</td>
+  <td class="description">TRENITALIA WEB AGENCY   ROMA</td>
+  <td class="amount">102,00</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>196</td>
+  <td class="status">❌</td>
+  <td>05/08/2026</td>
+  <td class="description">TRENITALIA WEB AGENCY   ROMA</td>
+  <td class="amount">191,00</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>197</td>
+  <td class="status">❌</td>
+  <td>05/08/2026</td>
+  <td class="description">USCUSTOMS ESTA APPL PMT INDIANAPOLIS</td>
+  <td class="amount">35,15</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>198</td>
+  <td class="status">❌</td>
+  <td>05/08/2026</td>
+  <td class="description">USCUSTOMS ESTA APPL PMT INDIANAPOLIS</td>
+  <td class="amount">35,15</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="no-match">
+  <td>199</td>
+  <td class="status">❌</td>
+  <td>05/08/2026</td>
+  <td class="description">WIZZ AIR MALTA LIMITED  VALETTA</td>
+  <td class="amount">201,39</td>
+  <td class="status-text">Nessun match</td>
+  <td></td>
+</tr><tr class="match">
+  <td>200</td>
+  <td class="status">✅</td>
+  <td>05/07/2026</td>
+  <td class="description">FLIXBUS.COM             MUNICH</td>
+  <td class="amount">25,98</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">AUT 1485 20</span><span class="detail">11/05/2026 — FB  FLIXBUS ITALIA  DEMARCO/MAURO</span></td>
+</tr><tr class="match">
+  <td>201</td>
+  <td class="status">✅</td>
+  <td>04/22/2026</td>
+  <td class="description">TRENITALIA WEB AGENCY   ROMA</td>
+  <td class="amount">-101,60</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">BF 2604220001 20</span><span class="detail">25/05/2026 — TRE TRENITALIA      BERGAMASCHI/ETTORE</span></td>
+</tr><tr class="match">
+  <td>202</td>
+  <td class="status">✅</td>
+  <td>04/22/2026</td>
+  <td class="description">TRENITALIA WEB AGENCY   ROMA</td>
+  <td class="amount">-101,60</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">BF 2604220003 20</span><span class="detail">29/05/2026 — TRE TRENITALIA      BERGAMASCHI/ETTORE</span></td>
+</tr><tr class="match">
+  <td>203</td>
+  <td class="status">✅</td>
+  <td>04/01/2026</td>
+  <td class="description">TRENITALIA WEB AGENCY   ROMA</td>
+  <td class="amount">-141,00</td>
+  <td class="status-text">Match</td>
+  <td><span class="identificativo">BF 2604020002 20</span><span class="detail">20/04/2026 — TRE TRENITALIA      D'ERCHIE/LUIGI</span></td>
+</tr></tbody>
+  </table>
+</body>
+</html>
