@@ -3,10 +3,11 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 
 from dotenv import load_dotenv
 
-from trans_matching.paths import ROOT
+from trans_matching.paths import AGENT_LOG_DIR, ROOT
 
 load_dotenv(ROOT / ".env")
 
@@ -16,10 +17,37 @@ class ExpediaMatcherMode(str, Enum):
     LLM = "llm"
 
 
+class MatcherMode(str, Enum):
+    LEGACY = "legacy"
+    AGENT = "agent"
+
+
 @dataclass(frozen=True)
 class OpenAIConfig:
     api_key: str
     model: str
+    base_url: str | None = None
+
+
+@dataclass(frozen=True)
+class AgentConfig:
+    max_iterations: int
+    date_window_days: int
+
+
+@dataclass(frozen=True)
+class AgentLogConfig:
+    level: str
+    log_dir: Path
+    log_llm_body: bool
+    log_email_body: bool
+
+
+@dataclass(frozen=True)
+class MscEmailConfig:
+    from_addresses: tuple[str, ...]
+    search_days: int
+    keywords: tuple[str, ...]
 
 
 def get_expedia_matcher_mode() -> ExpediaMatcherMode:
@@ -32,10 +60,66 @@ def get_expedia_matcher_mode() -> ExpediaMatcherMode:
 def get_openai_config() -> OpenAIConfig:
     api_key = os.getenv("OPENAI_API_KEY", "").strip()
     if not api_key:
-        raise ValueError("OPENAI_API_KEY richiesta quando EXPEDIA_MATCHER=llm")
+        raise ValueError("OPENAI_API_KEY richiesta")
+    base_url = os.getenv("OPENAI_BASE_URL", "").strip() or None
     return OpenAIConfig(
         api_key=api_key,
         model=os.getenv("OPENAI_MODEL", "gpt-4o-mini").strip(),
+        base_url=base_url,
+    )
+
+
+def get_matcher_mode() -> MatcherMode:
+    raw = os.getenv("MATCHER_MODE", "legacy").strip().lower()
+    if raw == "agent":
+        return MatcherMode.AGENT
+    return MatcherMode.LEGACY
+
+
+def get_agent_config() -> AgentConfig:
+    try:
+        max_iterations = int(os.getenv("AGENT_MAX_ITERATIONS", "12"))
+    except ValueError:
+        max_iterations = 12
+    try:
+        date_window_days = int(os.getenv("AGENT_DATE_WINDOW_DAYS", "7"))
+    except ValueError:
+        date_window_days = 7
+    return AgentConfig(
+        max_iterations=max(1, max_iterations),
+        date_window_days=max(1, date_window_days),
+    )
+
+
+def _env_bool(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name, str(default)).strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
+def get_agent_log_config() -> AgentLogConfig:
+    return AgentLogConfig(
+        level=os.getenv("AGENT_LOG_LEVEL", "INFO").strip().upper(),
+        log_dir=Path(os.getenv("AGENT_LOG_DIR", str(AGENT_LOG_DIR))),
+        log_llm_body=_env_bool("AGENT_LOG_LLM_BODY"),
+        log_email_body=_env_bool("AGENT_LOG_EMAIL_BODY"),
+    )
+
+
+def get_msc_email_config() -> MscEmailConfig:
+    raw_from = os.getenv("MSC_EMAIL_FROM", "").strip()
+    addresses = tuple(
+        part.strip() for part in raw_from.split(",") if part.strip()
+    ) or ("noreply@mscbook.it",)
+    try:
+        search_days = int(os.getenv("MSC_SEARCH_DAYS", "5"))
+    except ValueError:
+        search_days = 5
+    raw_keywords = os.getenv("MSC_SEARCH_KEYWORDS", "MSC,crociera,booking").strip()
+    keywords = tuple(part.strip() for part in raw_keywords.split(",") if part.strip())
+    return MscEmailConfig(
+        from_addresses=addresses,
+        search_days=max(1, search_days),
+        keywords=keywords,
     )
 
 

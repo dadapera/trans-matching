@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Report Matching Agentico</title>
+  <style>
+    :root {
+      --green: #16a34a; --red: #dc2626;
+      --bg: #f8fafc; --card: #ffffff; --border: #e2e8f0;
+      --text: #1e293b; --muted: #64748b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg); color: var(--text); padding: 2rem; line-height: 1.5;
+    }
+    h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
+    .meta { color: var(--muted); font-size: 0.875rem; margin-bottom: 1.5rem; }
+    .summary { display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+    .summary-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 8px; padding: 1rem 1.5rem; min-width: 140px;
+    }
+    .summary-card .value { font-size: 1.75rem; font-weight: 700; }
+    .summary-card .label { font-size: 0.8rem; color: var(--muted); }
+    .summary-card.matched .value { color: var(--green); }
+    .summary-card.unmatched .value { color: var(--red); }
+    table {
+      width: 100%; border-collapse: collapse; background: var(--card);
+      border: 1px solid var(--border); border-radius: 8px; overflow: hidden; font-size: 0.875rem;
+    }
+    th { background: #f1f5f9; text-align: left; padding: 0.75rem 1rem; font-weight: 600; border-bottom: 1px solid var(--border); }
+    td { padding: 0.6rem 1rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    tr.match { background: #f0fdf4; }
+    tr.no-match { background: #fef2f2; }
+    .status { font-size: 1.25rem; text-align: center; width: 3rem; }
+    .amount { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .description { max-width: 280px; word-break: break-word; }
+    .identificativo { font-weight: 600; display: block; }
+    .detail { color: var(--muted); font-size: 0.8rem; display: block; }
+    .llm-reason {
+      color: #475569; font-size: 0.8rem; display: block; margin-top: 0.35rem;
+      padding: 0.35rem 0.5rem; background: #f1f5f9; border-radius: 4px;
+    }
+    .llm-reason-label { font-weight: 600; color: #334155; }
+    .llm-confidence {
+      display: inline-block; font-size: 0.75rem; font-weight: 700;
+      padding: 0.15rem 0.45rem; border-radius: 4px; margin-top: 0.35rem;
+      text-transform: uppercase; letter-spacing: 0.02em;
+    }
+    .llm-confidence-alto { background: #dcfce7; color: #166534; }
+    .llm-confidence-medio { background: #fef9c3; color: #854d0e; }
+    .llm-confidence-basso { background: #fee2e2; color: #991b1b; }
+    .status-text { font-weight: 600; }
+    tr.match .status-text { color: var(--green); }
+    tr.no-match .status-text { color: var(--red); }
+  
+    tr.ambiguous { background: #fffbeb; }
+    tr.ambiguous .status-text { color: #b45309; }
+    .alternatives { display: block; margin-top: 0.35rem; font-size: 0.8rem; color: #92400e; }
+    .alternatives-label { font-weight: 600; }
+    .trace-link { display: block; margin-top: 0.35rem; font-size: 0.75rem; }
+    .trace-section { margin-top: 2rem; padding: 1rem; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; }
+    
+  </style>
+</head>
+<body>
+  <h1>Report Matching Agentico</h1>
+  <p class="meta">Generato il 23/06/2026 15:36 — Run agent #1 — modello gpt-5.4-mini-2026-03-17 — log run-20260623-173636-id0.jsonl</p>
+  <div class="summary"><div class="summary-card ">
+  <div class="value">2</div>
+  <div class="label">Transazioni carta</div>
+</div><div class="summary-card matched">
+  <div class="value">0</div>
+  <div class="label">✅ Match</div>
+</div><div class="summary-card ">
+  <div class="value">0</div>
+  <div class="label">⚠️ Ambigui</div>
+</div><div class="summary-card unmatched">
+  <div class="value">2</div>
+  <div class="label">❌ Senza match</div>
+</div></div>
+  <table>
+    <thead><tr><th>#</th><th></th><th>Data</th><th>Descrizione (carta)</th><th>Importo</th><th>Esito</th><th>Dettaglio</th></tr></thead>
+    <tbody><tr class="no-match">
+  <td>1</td>
+  <td class="status">❌</td>
+  <td>06/08/2026</td>
+  <td class="description">EG*TRVL73443592561624   0269430760</td>
+  <td class="amount">938,09</td>
+  <td class="status-text">Nessun match</td>
+  <td><span class="llm-confidence llm-confidence-basso">Affidabilità: Basso</span><span class="llm-reason"><span class="llm-reason-label">Motivazione:</span> Errore agente: Connection error.</span><span class="trace-link"><a href="#trace-run-0-txn-001">Trace run-0-txn-001</a></span></td>
+</tr><tr class="no-match">
+  <td>2</td>
+  <td class="status">❌</td>
+  <td>06/08/2026</td>
+  <td class="description">EG*TRVL73468961378449   0269430760</td>
+  <td class="amount">510,66</td>
+  <td class="status-text">Nessun match</td>
+  <td><span class="llm-confidence llm-confidence-basso">Affidabilità: Basso</span><span class="llm-reason"><span class="llm-reason-label">Motivazione:</span> Errore agente: Connection error.</span><span class="trace-link"><a href="#trace-run-0-txn-002">Trace run-0-txn-002</a></span></td>
+</tr></tbody>
+  </table>
+<div class='traces'><section id="trace-run-0-txn-001" class="trace-section"><h3>Trace run-0-txn-001</h3><p>Strategia: expedia — Confidenza: basso — Matched: False</p><p>Errore agente: Connection error.</p></section><section id="trace-run-0-txn-002" class="trace-section"><h3>Trace run-0-txn-002</h3><p>Strategia: expedia — Confidenza: basso — Matched: False</p><p>Errore agente: Connection error.</p></section></div></body>
+</html>

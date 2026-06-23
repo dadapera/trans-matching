@@ -16,3 +16,6 @@ credentials.json
 
 # Local run database
 matching.db
+
+# Agent debug logs
+logs/
