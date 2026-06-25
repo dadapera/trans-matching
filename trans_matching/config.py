@@ -66,7 +66,7 @@ def get_openai_config() -> OpenAIConfig:
     base_url = os.getenv("OPENAI_BASE_URL", "").strip() or None
     return OpenAIConfig(
         api_key=api_key,
-        model=os.getenv("OPENAI_MODEL", "gpt-4o-mini").strip(),
+        model=os.getenv("OPENAI_MODEL", "gpt-5.4-mini-2026-03-17").strip(),
         base_url=base_url,
     )
 
@@ -121,7 +121,7 @@ def get_msc_email_config() -> MscEmailConfig:
     raw_from = os.getenv("MSC_EMAIL_FROM", "").strip()
     addresses = tuple(
         part.strip() for part in raw_from.split(",") if part.strip()
-    ) or ("noreply@mscbook.it",)
+    ) or ("msc-booking.no-reply@msccrociere.it",)
     try:
         search_days = int(os.getenv("MSC_SEARCH_DAYS", "5"))
     except ValueError:
@@ -146,6 +146,7 @@ def get_expedia_llm_batch_size() -> int:
 
 # USD per 1M token (input, output)
 _DEFAULT_OPENAI_PRICING: dict[str, tuple[float, float]] = {
+    "gpt-5.4-mini": (0.75, 4.50),
     "gpt-4o-mini": (0.15, 0.60),
     "gpt-4o": (2.50, 10.00),
     "gpt-4.1-mini": (0.40, 1.60),
