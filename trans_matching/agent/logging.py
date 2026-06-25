@@ -6,6 +6,7 @@ import sys
 import traceback
 from datetime import datetime, timezone
 from pathlib import Path
+from collections.abc import Callable
 from typing import Any
 
 from trans_matching.config import get_agent_log_config
@@ -36,9 +37,11 @@ class AgentRunLogger:
         run_id: int,
         log_path: Path,
         console_level: str = "INFO",
+        on_event: Callable[[dict[str, Any]], None] | None = None,
     ) -> None:
         self.run_id = run_id
         self.log_path = log_path
+        self._on_event = on_event
         self._events: list[dict[str, Any]] = []
         self._console = logging.getLogger(f"trans_matching.agent.run-{run_id}")
         self._console.setLevel(getattr(logging, console_level.upper(), logging.INFO))
@@ -77,6 +80,9 @@ class AgentRunLogger:
         level = _EVENT_LEVELS.get(event, logging.INFO)
         summary = _format_console(record)
         self._console.log(level, summary)
+
+        if self._on_event is not None:
+            self._on_event(record)
 
     def log_error(
         self,
@@ -134,8 +140,17 @@ def _format_console(record: dict[str, Any]) -> str:
     return " | ".join(parts)
 
 
-def create_run_logger(run_id: int) -> AgentRunLogger:
+def create_run_logger(
+    run_id: int,
+    *,
+    on_event: Callable[[dict[str, Any]], None] | None = None,
+) -> AgentRunLogger:
     config = get_agent_log_config()
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     log_path = config.log_dir / f"run-{stamp}-id{run_id}.jsonl"
-    return AgentRunLogger(run_id=run_id, log_path=log_path, console_level=config.level)
+    return AgentRunLogger(
+        run_id=run_id,
+        log_path=log_path,
+        console_level=config.level,
+        on_event=on_event,
+    )

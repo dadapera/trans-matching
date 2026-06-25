@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from trans_matching.agent.callbacks import AgentTraceCallback
 from trans_matching.agent.context import MatchSession, reset_session, set_session
+from trans_matching.agent.rate_limit import invoke_with_rate_limit_retry
 from trans_matching.agent.router import classify_card_transaction
 from trans_matching.agent.tools import (
     AGENT_TOOLS,
@@ -65,18 +66,22 @@ Regole confidenza:
 Non usare confidence alto/medio se restano alternative equivalenti: elencale in alternatives.
 Se non c'è evidenza sufficiente, lascia identificativi vuoti e confidence basso.
 
-Formati gestionale: identificativo|data|importo|descrizione (es. RYA RYANAIR COGNOME/NOME)."""
+Formati gestionale: identificativo|data|importo|descrizione  [available]
+oppure  [matched → txn #N, conf: alto|medio|basso] se già abbinate.
+Non riusare righe [matched] se esistono alternative [available] equivalenti."""
 
 
 def get_matching_agent():
     global _MATCHING_AGENT
     if _MATCHING_AGENT is None:
         config = get_openai_config()
+        agent_config = get_agent_config()
         llm = ChatOpenAI(
             model=config.model,
             api_key=config.api_key,
             base_url=config.base_url,
             temperature=0,
+            max_retries=agent_config.rate_limit_max_retries,
             http_client=build_openai_http_client(),
             http_async_client=build_openai_async_http_client(),
         )
@@ -116,12 +121,27 @@ def match_one(session: MatchSession) -> AgentMatchResult:
         )
 
         callback = AgentTraceCallback()
-        result = agent.invoke(
-            {"messages": [{"role": "user", "content": user_prompt}]},
-            config={
-                "callbacks": [callback],
-                "recursion_limit": agent_config.max_iterations * 2,
-            },
+        invoke_config = {
+            "callbacks": [callback],
+            "recursion_limit": agent_config.max_iterations * 2,
+        }
+
+        def _invoke_agent():
+            return agent.invoke(
+                {"messages": [{"role": "user", "content": user_prompt}]},
+                config=invoke_config,
+            )
+
+        result = invoke_with_rate_limit_retry(
+            _invoke_agent,
+            max_retries=agent_config.rate_limit_max_retries,
+            on_retry=lambda attempt, wait, exc: session.logger.log(
+                "rate_limit_retry",
+                trace_id=session.trace_id,
+                attempt=attempt,
+                wait_seconds=round(wait, 2),
+                error=str(exc)[:200],
+            ),
         )
 
         output = _extract_structured_output(result)
@@ -169,6 +189,11 @@ def match_one(session: MatchSession) -> AgentMatchResult:
                 f"{reason}. Verifica rete/VPN; se SSL fallisce imposta "
                 "OPENAI_VERIFY_SSL=false o OPENAI_CA_BUNDLE in .env"
             )
+        elif "rate limit" in reason.lower() or "429" in reason:
+            reason = (
+                f"{reason}. Aumenta AGENT_TXN_DELAY_SECONDS (es. 1-2) "
+                "o AGENT_RATE_LIMIT_MAX_RETRIES in .env"
+            )
         session.logger.log_error("error", exc, trace_id=session.trace_id, phase="match_one")
         return AgentMatchResult(
             card=session.card,
@@ -192,10 +217,11 @@ Transazione carta:
 - descrizione: {session.card.description}
 - categoria suggerita: {category}
 
-Gestionale disponibile (identificativo|data|importo|descrizione):
+Gestionale (tutte le righe; [available] o già abbinate):
 {session.pool.format_rows()}
 
 Finestra date suggerita: ±{session.date_window_days} giorni.
+Se una riga è [matched → txn #N], preferisci alternative [available] salvo evidenza forte.
 Restituisci identificativi (1 o più), confidence, reason, alternatives se ambiguo."""
 
 

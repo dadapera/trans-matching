@@ -6,12 +6,15 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
+from typing import Literal
 
 from trans_matching.config import get_openai_config
 from trans_matching.llm_usage import get_llm_usage
 from trans_matching.matchers.agent_models import AgentMatchResult, MatchAlternative
 from trans_matching.models import Transaction
 from trans_matching.paths import DB_PATH
+
+RunStatus = Literal["running", "completed", "stopped", "error"]
 
 _AGENT_SCHEMA = """
 CREATE TABLE IF NOT EXISTS agent_runs (
@@ -25,7 +28,9 @@ CREATE TABLE IF NOT EXISTS agent_runs (
     llm_cost_usd REAL,
     llm_prompt_tokens INTEGER,
     llm_completion_tokens INTEGER,
-    llm_requests INTEGER
+    llm_requests INTEGER,
+    status TEXT NOT NULL DEFAULT 'completed',
+    expected_transactions INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS agent_match_results (
@@ -73,6 +78,8 @@ class AgentRunRecord:
     llm_prompt_tokens: int | None
     llm_completion_tokens: int | None
     llm_requests: int | None
+    status: str
+    expected_transactions: int | None
 
 
 def _connect(db_path: Path = DB_PATH) -> sqlite3.Connection:
@@ -81,7 +88,18 @@ def _connect(db_path: Path = DB_PATH) -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.executescript(_AGENT_SCHEMA)
     conn.execute("PRAGMA foreign_keys = ON")
+    _migrate_schema(conn)
     return conn
+
+
+def _migrate_schema(conn: sqlite3.Connection) -> None:
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(agent_runs)").fetchall()}
+    if "status" not in columns:
+        conn.execute(
+            "ALTER TABLE agent_runs ADD COLUMN status TEXT NOT NULL DEFAULT 'completed'"
+        )
+    if "expected_transactions" not in columns:
+        conn.execute("ALTER TABLE agent_runs ADD COLUMN expected_transactions INTEGER")
 
 
 def _serialize_gestionale(entries: list[Transaction]) -> str:
@@ -140,6 +158,180 @@ def _deserialize_alternatives(raw: str | None) -> list[MatchAlternative]:
     ]
 
 
+def _result_insert_params(run_id: int, result: AgentMatchResult) -> tuple:
+    return (
+        run_id,
+        result.row_number,
+        int(result.matched),
+        result.trace_id,
+        result.card.date,
+        result.card.description,
+        str(result.card.amount),
+        result.confidence,
+        result.reason,
+        result.strategy,
+        _serialize_gestionale(result.gestionale),
+        _serialize_alternatives(result.alternatives),
+    )
+
+
+def create_agent_run(
+    expected_transactions: int,
+    *,
+    db_path: Path = DB_PATH,
+) -> int:
+    created_at = datetime.now(timezone.utc).isoformat()
+    model = get_openai_config().model
+    with _connect(db_path) as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO agent_runs (
+                created_at, openai_model, total_transactions, matched_count,
+                elapsed_seconds, log_path, status, expected_transactions
+            ) VALUES (?, ?, 0, 0, NULL, NULL, 'running', ?)
+            """,
+            (created_at, model, expected_transactions),
+        )
+        conn.commit()
+        return int(cursor.lastrowid)
+
+
+def save_agent_match_result(
+    run_id: int,
+    result: AgentMatchResult,
+    *,
+    db_path: Path = DB_PATH,
+) -> None:
+    with _connect(db_path) as conn:
+        conn.execute(
+            """
+            INSERT INTO agent_match_results (
+                run_id, row_number, matched, trace_id,
+                card_date, card_description, card_amount,
+                agent_confidence, agent_reason, agent_strategy,
+                gestionale_entries_json, alternatives_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            _result_insert_params(run_id, result),
+        )
+        matched_delta = 1 if result.matched else 0
+        conn.execute(
+            """
+            UPDATE agent_runs
+            SET total_transactions = total_transactions + 1,
+                matched_count = matched_count + ?
+            WHERE id = ?
+            """,
+            (matched_delta, run_id),
+        )
+        conn.commit()
+
+
+def update_agent_run(
+    run_id: int,
+    *,
+    status: RunStatus | None = None,
+    elapsed_seconds: float | None = None,
+    log_path: Path | str | None = None,
+    matched_count: int | None = None,
+    total_transactions: int | None = None,
+    db_path: Path = DB_PATH,
+) -> None:
+    usage = get_llm_usage()
+    fields: list[str] = []
+    values: list[object] = []
+
+    if status is not None:
+        fields.append("status = ?")
+        values.append(status)
+    if elapsed_seconds is not None:
+        fields.append("elapsed_seconds = ?")
+        values.append(elapsed_seconds)
+    if log_path is not None:
+        fields.append("log_path = ?")
+        values.append(str(log_path))
+    if matched_count is not None:
+        fields.append("matched_count = ?")
+        values.append(matched_count)
+    if total_transactions is not None:
+        fields.append("total_transactions = ?")
+        values.append(total_transactions)
+
+    fields.extend(
+        [
+            "llm_cost_usd = ?",
+            "llm_prompt_tokens = ?",
+            "llm_completion_tokens = ?",
+            "llm_requests = ?",
+        ]
+    )
+    values.extend(
+        [
+            usage.estimated_cost_usd(),
+            usage.prompt_tokens or None,
+            usage.completion_tokens or None,
+            usage.requests or None,
+        ]
+    )
+    values.append(run_id)
+
+    with _connect(db_path) as conn:
+        conn.execute(
+            f"UPDATE agent_runs SET {', '.join(fields)} WHERE id = ?",
+            values,
+        )
+        conn.commit()
+
+
+def list_agent_runs(
+    *,
+    limit: int = 20,
+    db_path: Path = DB_PATH,
+) -> list[AgentRunRecord]:
+    with _connect(db_path) as conn:
+        rows = conn.execute(
+            """
+            SELECT * FROM agent_runs
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+    return [_row_to_run_record(row) for row in rows]
+
+
+def load_agent_results(
+    run_id: int,
+    *,
+    db_path: Path = DB_PATH,
+) -> list[AgentMatchResult]:
+    with _connect(db_path) as conn:
+        rows = conn.execute(
+            """
+            SELECT * FROM agent_match_results
+            WHERE run_id = ?
+            ORDER BY row_number
+            """,
+            (run_id,),
+        ).fetchall()
+    return [_row_to_agent_result(row) for row in rows]
+
+
+def get_agent_run(
+    run_id: int,
+    *,
+    db_path: Path = DB_PATH,
+) -> AgentRunRecord:
+    with _connect(db_path) as conn:
+        row = conn.execute(
+            "SELECT * FROM agent_runs WHERE id = ?",
+            (run_id,),
+        ).fetchone()
+    if row is None:
+        raise ValueError(f"Agent run {run_id} non trovata")
+    return _row_to_run_record(row)
+
+
 def save_agent_run(
     results: list[AgentMatchResult],
     *,
@@ -161,8 +353,8 @@ def save_agent_run(
                 INSERT INTO agent_runs (
                     created_at, openai_model, total_transactions, matched_count,
                     elapsed_seconds, log_path, llm_cost_usd, llm_prompt_tokens,
-                    llm_completion_tokens, llm_requests
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    llm_completion_tokens, llm_requests, status, expected_transactions
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', ?)
                 """,
                 (
                     created_at,
@@ -175,39 +367,53 @@ def save_agent_run(
                     usage.prompt_tokens or None,
                     usage.completion_tokens or None,
                     usage.requests or None,
+                    len(results),
                 ),
             )
             saved_run_id = int(cursor.lastrowid)
         else:
             saved_run_id = run_id
-
-        conn.executemany(
-            """
-            INSERT INTO agent_match_results (
-                run_id, row_number, matched, trace_id,
-                card_date, card_description, card_amount,
-                agent_confidence, agent_reason, agent_strategy,
-                gestionale_entries_json, alternatives_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            [
+            conn.execute(
+                """
+                UPDATE agent_runs
+                SET total_transactions = ?,
+                    matched_count = ?,
+                    elapsed_seconds = ?,
+                    log_path = ?,
+                    llm_cost_usd = ?,
+                    llm_prompt_tokens = ?,
+                    llm_completion_tokens = ?,
+                    llm_requests = ?,
+                    status = 'completed',
+                    expected_transactions = COALESCE(expected_transactions, ?)
+                WHERE id = ?
+                """,
                 (
-                    saved_run_id,
-                    result.row_number,
-                    int(result.matched),
-                    result.trace_id,
-                    result.card.date,
-                    result.card.description,
-                    str(result.card.amount),
-                    result.confidence,
-                    result.reason,
-                    result.strategy,
-                    _serialize_gestionale(result.gestionale),
-                    _serialize_alternatives(result.alternatives),
-                )
-                for result in results
-            ],
-        )
+                    len(results),
+                    matched_count,
+                    elapsed_seconds,
+                    str(log_path) if log_path else None,
+                    usage.estimated_cost_usd(),
+                    usage.prompt_tokens or None,
+                    usage.completion_tokens or None,
+                    usage.requests or None,
+                    len(results),
+                    run_id,
+                ),
+            )
+
+        if run_id is None or not _run_has_results(conn, saved_run_id):
+            conn.executemany(
+                """
+                INSERT INTO agent_match_results (
+                    run_id, row_number, matched, trace_id,
+                    card_date, card_description, card_amount,
+                    agent_confidence, agent_reason, agent_strategy,
+                    gestionale_entries_json, alternatives_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                [_result_insert_params(saved_run_id, result) for result in results],
+            )
         if trace_events:
             conn.executemany(
                 """
@@ -229,6 +435,14 @@ def save_agent_run(
             )
         conn.commit()
         return saved_run_id
+
+
+def _run_has_results(conn: sqlite3.Connection, run_id: int) -> bool:
+    row = conn.execute(
+        "SELECT 1 FROM agent_match_results WHERE run_id = ? LIMIT 1",
+        (run_id,),
+    ).fetchone()
+    return row is not None
 
 
 def _trace_row_number(trace_id: str | None) -> int | None:
@@ -282,6 +496,9 @@ def _resolve_run_id(conn: sqlite3.Connection, run_id: int | None) -> int:
 
 
 def _row_to_run_record(row: sqlite3.Row) -> AgentRunRecord:
+    keys = row.keys()
+    status = row["status"] if "status" in keys else "completed"
+    expected = row["expected_transactions"] if "expected_transactions" in keys else None
     return AgentRunRecord(
         id=row["id"],
         created_at=row["created_at"],
@@ -294,6 +511,8 @@ def _row_to_run_record(row: sqlite3.Row) -> AgentRunRecord:
         llm_prompt_tokens=row["llm_prompt_tokens"],
         llm_completion_tokens=row["llm_completion_tokens"],
         llm_requests=row["llm_requests"],
+        status=status,
+        expected_transactions=expected,
     )
 
 

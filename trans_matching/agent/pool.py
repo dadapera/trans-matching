@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from decimal import Decimal
 
 from trans_matching.agent.dates import dates_within_window
@@ -11,12 +12,18 @@ from trans_matching.matchers.gestionale_text import (
 from trans_matching.models import Transaction
 
 
+@dataclass(frozen=True)
+class RowAssignment:
+    card_row_number: int
+    confidence: str
+
+
 class GestionalePool:
-    """Pool righe gestionale con tracking righe già abbinate."""
+    """Pool righe gestionale con tracking assegnazioni e visibilità completa."""
 
     def __init__(self, transactions: list[Transaction]) -> None:
         self._all = list(transactions)
-        self._used_keys: set[str] = set()
+        self._assignments: dict[str, RowAssignment] = {}
 
     @staticmethod
     def _key(txn: Transaction) -> str:
@@ -28,29 +35,67 @@ class GestionalePool:
 
     @property
     def available_count(self) -> int:
-        return sum(1 for txn in self._all if self._key(txn) not in self._used_keys)
+        return sum(1 for txn in self._all if self.is_available(txn))
+
+    @property
+    def assigned_count(self) -> int:
+        return len(self._assignments)
+
+    def is_available(self, txn: Transaction) -> bool:
+        return self._key(txn) not in self._assignments
 
     def available(self) -> list[Transaction]:
-        return [txn for txn in self._all if self._key(txn) not in self._used_keys]
+        return [txn for txn in self._all if self.is_available(txn)]
 
-    def mark_used(self, transactions: list[Transaction]) -> list[str]:
-        marked: list[str] = []
+    def get_assignment(self, txn: Transaction) -> RowAssignment | None:
+        return self._assignments.get(self._key(txn))
+
+    def assign(
+        self,
+        transactions: list[Transaction],
+        *,
+        card_row_number: int,
+        confidence: str,
+    ) -> list[str]:
+        assigned: list[str] = []
         for txn in transactions:
             key = self._key(txn)
-            if key in self._used_keys:
-                continue
-            self._used_keys.add(key)
-            marked.append(txn.identificativo or key)
-        return marked
+            self._assignments[key] = RowAssignment(
+                card_row_number=card_row_number,
+                confidence=confidence,
+            )
+            assigned.append(txn.identificativo or key)
+        return assigned
+
+    def has_assignment_conflict(
+        self,
+        identificativi: list[str],
+        card_row_number: int,
+    ) -> bool:
+        for txn in self.find_by_identificativi(identificativi):
+            assignment = self.get_assignment(txn)
+            if assignment is not None and assignment.card_row_number != card_row_number:
+                return True
+        return False
 
     def find_by_identificativi(self, identificativi: list[str]) -> list[Transaction]:
         targets = {value.strip().upper() for value in identificativi if value.strip()}
         found: list[Transaction] = []
-        for txn in self.available():
+        for txn in self._all:
             ident = txn.identificativo.strip().upper()
             if ident in targets:
                 found.append(txn)
         return found
+
+    def format_row(self, txn: Transaction) -> str:
+        base = f"{txn.identificativo}|{txn.date}|{txn.amount}|{txn.description}"
+        assignment = self.get_assignment(txn)
+        if assignment is None:
+            return f"{base}  [available]"
+        return (
+            f"{base}  [matched → txn #{assignment.card_row_number}, "
+            f"conf: {assignment.confidence}]"
+        )
 
     def search(
         self,
@@ -65,7 +110,7 @@ class GestionalePool:
         results: list[tuple[int, Transaction]] = []
         text_norm = normalize_text(text or "") if text else ""
 
-        for txn in self.available():
+        for txn in self._all:
             score = 0
             if text_norm:
                 haystack = normalize_text(txn.description)
@@ -96,7 +141,10 @@ class GestionalePool:
                 score -= 1
 
             if score > 0 or (not text_norm and amount is None):
-                results.append((score, txn))
+                if not self.is_available(txn) and score > 0:
+                    score -= 3
+                if score > 0:
+                    results.append((score, txn))
 
         results.sort(key=lambda item: (-item[0], item[1].date, item[1].identificativo))
         return [txn for _, txn in results[:limit]]
@@ -111,7 +159,7 @@ class GestionalePool:
         date_window_days: int = 7,
     ) -> list[Transaction]:
         scored: list[tuple[int, Transaction]] = []
-        for txn in self.available():
+        for txn in self._all:
             if guest and not guest_matches(txn.description, guest):
                 continue
             if hotel and not hotel_matches(txn.description, hotel):
@@ -126,14 +174,14 @@ class GestionalePool:
                 score += 2
             if amount is not None and txn.amount == amount:
                 score += 3
-            scored.append((score, txn))
+            if not self.is_available(txn):
+                score -= 3
+            if score > 0:
+                scored.append((score, txn))
 
         scored.sort(key=lambda item: (-item[0], item[1].date))
         return [txn for _, txn in scored]
 
     def format_rows(self, transactions: list[Transaction] | None = None) -> str:
-        rows = transactions or self.available()
-        return "\n".join(
-            f"{txn.identificativo}|{txn.date}|{txn.amount}|{txn.description}"
-            for txn in rows
-        )
+        rows = transactions if transactions is not None else self._all
+        return "\n".join(self.format_row(txn) for txn in rows)

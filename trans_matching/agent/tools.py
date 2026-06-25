@@ -37,7 +37,7 @@ def search_gestionale(
     )
     payload = {
         "count": len(rows),
-        "rows": [f"{txn.identificativo}|{txn.date}|{txn.amount}|{txn.description}" for txn in rows],
+        "rows": [session.pool.format_row(txn) for txn in rows],
     }
     _log_tool(session, "search_gestionale", payload, started)
     return json.dumps(payload, ensure_ascii=False)
@@ -140,8 +140,7 @@ def search_expedia(booking_code: str = "") -> str:
         "guest": guest,
         "email_text": email_text if log_config.log_email_body else email_text[:300],
         "gestionale_candidates": [
-            f"{txn.identificativo}|{txn.date}|{txn.amount}|{txn.description}"
-            for txn in gestionale_hits[:10]
+            session.pool.format_row(txn) for txn in gestionale_hits[:10]
         ],
     }
     _log_tool(session, "search_expedia", {"booking_code": code, "candidates": len(gestionale_hits)}, started)
@@ -194,10 +193,7 @@ def search_msc(payment_date: str = "", amount: float | None = None) -> str:
         "payment_date": pay_date,
         "emails_scanned": len(collected),
         "emails": collected[:5],
-        "gestionale_candidates": [
-            f"{txn.identificativo}|{txn.date}|{txn.amount}|{txn.description}"
-            for txn in gestionale_hits
-        ],
+        "gestionale_candidates": [session.pool.format_row(txn) for txn in gestionale_hits],
         "note": "Parser MSC incompleto: affinare MSC_EMAIL_FROM e campi email quando disponibili.",
     }
     _log_tool(session, "search_msc", {"emails": len(collected), "candidates": len(gestionale_hits)}, started)
@@ -238,8 +234,9 @@ def apply_confidence_gate(
     identificativi: list[str],
     alternatives: list[MatchAlternative],
     pool,
+    card_row_number: int,
 ) -> tuple[bool, list[Transaction], Confidence]:
-    """Match confermato solo con confidence alto/medio e identificativi risolvibili."""
+    """Match confermato solo con confidence alto/medio, identificativi risolvibili e senza conflitti."""
     strong_alternatives = [
         alt for alt in alternatives if alt.confidence in ("alto", "medio")
     ]
@@ -248,6 +245,9 @@ def apply_confidence_gate(
 
     if confidence not in ("alto", "medio") or not identificativi:
         return False, [], confidence if confidence == "basso" else "basso"
+
+    if pool.has_assignment_conflict(identificativi, card_row_number):
+        return False, [], "basso"
 
     resolved = pool.find_by_identificativi(identificativi)
     if not resolved:
@@ -272,9 +272,12 @@ def build_result_from_output(
         identificativi=identificativi,
         alternatives=alternatives,
         pool=pool,
+        card_row_number=row_number,
     )
     gate_reason = reason
-    if not matched and confidence in ("alto", "medio"):
+    if not matched and pool.has_assignment_conflict(identificativi, row_number):
+        gate_reason = f"{reason} [Gate: riga già assegnata ad altra transazione]"
+    elif not matched and confidence in ("alto", "medio"):
         gate_reason = f"{reason} [Gate: match non confermato]"
     elif not matched and confidence == "basso":
         gate_reason = reason or "Confidenza bassa: nessun match confermato"

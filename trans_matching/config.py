@@ -33,6 +33,8 @@ class OpenAIConfig:
 class AgentConfig:
     max_iterations: int
     date_window_days: int
+    rate_limit_max_retries: int
+    txn_delay_seconds: float
 
 
 @dataclass(frozen=True)
@@ -85,9 +87,19 @@ def get_agent_config() -> AgentConfig:
         date_window_days = int(os.getenv("AGENT_DATE_WINDOW_DAYS", "7"))
     except ValueError:
         date_window_days = 7
+    try:
+        rate_limit_max_retries = int(os.getenv("AGENT_RATE_LIMIT_MAX_RETRIES", "8"))
+    except ValueError:
+        rate_limit_max_retries = 8
+    try:
+        txn_delay_seconds = float(os.getenv("AGENT_TXN_DELAY_SECONDS", "0"))
+    except ValueError:
+        txn_delay_seconds = 0.0
     return AgentConfig(
         max_iterations=max(1, max_iterations),
         date_window_days=max(1, date_window_days),
+        rate_limit_max_retries=max(0, rate_limit_max_retries),
+        txn_delay_seconds=max(0.0, txn_delay_seconds),
     )
 
 

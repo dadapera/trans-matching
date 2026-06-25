@@ -19,3 +19,6 @@ matching.db
 
 # Agent debug logs
 logs/
+
+# Dashboard frontend
+dashboard/node_modules/

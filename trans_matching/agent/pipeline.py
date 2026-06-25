@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import threading
 import time
+from collections.abc import Callable
 from decimal import Decimal
 
 from tqdm import tqdm
@@ -24,6 +26,11 @@ def run_agent_matching(
     *,
     run_id: int | None = None,
     logger: AgentRunLogger | None = None,
+    cancel_event: threading.Event | None = None,
+    on_result: Callable[[AgentMatchResult], None] | None = None,
+    progress_callback: Callable[[int, int], None] | None = None,
+    quiet: bool = False,
+    save_at_end: bool = True,
 ) -> tuple[list[AgentMatchResult], int, AgentRunLogger]:
     started = time.perf_counter()
     card_txns = card_transactions or load_card_transactions(CARTA_DIR)
@@ -38,10 +45,12 @@ def run_agent_matching(
     run_logger = logger or create_run_logger(provisional_run_id)
     agent_config = get_agent_config()
     pool = GestionalePool(gestionale_txns)
+    total = len(card_txns)
+    stopped_early = False
 
     run_logger.log(
         "run_start",
-        card_count=len(card_txns),
+        card_count=total,
         gestionale_count=len(gestionale_txns),
         gestionale_available=pool.available_count,
         date_window_days=agent_config.date_window_days,
@@ -55,10 +64,24 @@ def run_agent_matching(
 
     results: list[AgentMatchResult] = []
     with GmailReader() as reader:
-        progress = tqdm(card_txns, desc="Agent matching", unit="txn")
-        for index, card in enumerate(progress, start=1):
+        iterator = card_txns
+        if not quiet and progress_callback is None:
+            iterator = tqdm(card_txns, desc="Agent matching", unit="txn")
+
+        for index, card in enumerate(iterator, start=1):
+            if cancel_event is not None and cancel_event.is_set():
+                stopped_early = True
+                break
+
+            if index > 1 and agent_config.txn_delay_seconds > 0:
+                time.sleep(agent_config.txn_delay_seconds)
+
+            if progress_callback is not None:
+                progress_callback(index, total)
+            elif not quiet and hasattr(iterator, "set_postfix_str"):
+                iterator.set_postfix_str(card.description[:40])
+
             trace_id = f"run-{provisional_run_id}-txn-{index:03d}"
-            progress.set_postfix_str(card.description[:40])
             session = MatchSession(
                 pool=pool,
                 reader=reader,
@@ -73,32 +96,44 @@ def run_agent_matching(
             result.row_number = index
             result.trace_id = trace_id
             if result.matched:
-                marked = pool.mark_used(result.gestionale)
+                assigned = pool.assign(
+                    result.gestionale,
+                    card_row_number=index,
+                    confidence=result.confidence,
+                )
                 run_logger.log(
                     "pool_update",
                     trace_id=trace_id,
-                    marked=marked,
-                    remaining=pool.available_count,
+                    assigned=assigned,
+                    available=pool.available_count,
+                    assigned_total=pool.assigned_count,
                 )
             results.append(result)
+            if on_result is not None:
+                on_result(result)
 
     elapsed = time.perf_counter() - started
     matched = sum(1 for item in results if item.matched)
-    saved_run_id = save_agent_run(
-        results,
-        elapsed_seconds=elapsed,
-        log_path=run_logger.log_path,
-        run_id=run_id,
-        trace_events=run_logger.events,
-    )
-    if saved_run_id != provisional_run_id:
-        run_logger.log("run_end", run_id=saved_run_id, note="run_id aggiornato post-save")
+    saved_run_id = provisional_run_id
+
+    if save_at_end:
+        saved_run_id = save_agent_run(
+            results,
+            elapsed_seconds=elapsed,
+            log_path=run_logger.log_path,
+            run_id=run_id,
+            trace_events=run_logger.events,
+        )
+        if saved_run_id != provisional_run_id:
+            run_logger.log("run_end", run_id=saved_run_id, note="run_id aggiornato post-save")
 
     run_logger.log(
         "run_end",
         run_id=saved_run_id,
         matched=matched,
         total=len(results),
+        expected_total=total,
+        stopped_early=stopped_early,
         elapsed_seconds=round(elapsed, 2),
         log_path=str(run_logger.log_path),
     )
