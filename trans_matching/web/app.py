@@ -141,6 +141,11 @@ async def stream_events(run_id: int) -> StreamingResponse:
     )
 
 
+@app.get("/health")
+async def health() -> dict[str, str]:
+    return {"status": "ok"}
+
+
 @app.get("/api/session")
 async def get_session() -> dict:
     upload = run_manager.get_upload()

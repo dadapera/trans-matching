@@ -10,13 +10,15 @@ Dev workflow:
   Produzione (build statico servito da FastAPI):
     cd dashboard && npm run build
     uv run python main_dashboard.py
+
+  Docker:
+    docker compose up --build
+    # http://localhost:8000
 """
 
 import os
 
 import uvicorn
-
-from trans_matching.paths import ROOT
 
 
 def main() -> None:

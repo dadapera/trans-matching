@@ -1,0 +1,61 @@
+# Render Blueprint — Trans Matching Dashboard
+# https://render.com/docs/blueprint-spec
+#
+# Deploy: push questo file, poi apri il deeplink Blueprint (vedi README o sotto).
+# Su piano free il filesystem è effimero: matching.db e log si perdono a ogni redeploy.
+# Per persistenza SQLite, decommenta `disk` e passa a `plan: starter` (o superiore).
+
+services:
+  - type: web
+    name: trans-matching-dashboard
+    runtime: docker
+    plan: free
+    region: frankfurt
+    branch: main
+    autoDeploy: true
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    # Persistenza DB + log (richiede piano a pagamento, es. starter):
+    # plan: starter
+    # disk:
+    #   name: trans-matching-data
+    #   mountPath: /data
+    #   sizeGB: 1
+    envVars:
+      - key: DATA_DIR
+        value: /data
+      - key: AGENT_LOG_DIR
+        value: /data/logs
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-4o-mini
+      - key: GMAIL_ADDRESS
+        sync: false
+      - key: GMAIL_APP_PASSWORD
+        sync: false
+      - key: GMAIL_IMAP_HOST
+        value: imap.gmail.com
+      - key: GMAIL_IMAP_PORT
+        value: "993"
+      - key: AGENT_MAX_ITERATIONS
+        value: "12"
+      - key: AGENT_DATE_WINDOW_DAYS
+        value: "7"
+      - key: AGENT_RATE_LIMIT_MAX_RETRIES
+        value: "8"
+      - key: AGENT_TXN_DELAY_SECONDS
+        value: "0"
+      - key: AGENT_LOG_LEVEL
+        value: INFO
+      - key: AGENT_LOG_LLM_BODY
+        value: "false"
+      - key: AGENT_LOG_EMAIL_BODY
+        value: "false"
+      - key: MSC_EMAIL_FROM
+        value: noreply@mscbook.it
+      - key: MSC_SEARCH_DAYS
+        value: "5"
+      - key: MSC_SEARCH_KEYWORDS
+        value: MSC,crociera,booking

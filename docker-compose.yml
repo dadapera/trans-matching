@@ -1,0 +1,17 @@
+services:
+  dashboard:
+    build: .
+    ports:
+      - "${DASHBOARD_PORT:-8000}:8000"
+    env_file:
+      - .env
+    environment:
+      DATA_DIR: /data
+      AGENT_LOG_DIR: /data/logs
+      PORT: "8000"
+    volumes:
+      - trans-matching-data:/data
+    restart: unless-stopped
+
+volumes:
+  trans-matching-data:
