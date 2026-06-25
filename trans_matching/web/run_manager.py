@@ -210,8 +210,6 @@ class RunManager:
         q: queue.Queue[str] = queue.Queue(maxsize=500)
         with self._lock:
             self._subscribers[run_id].append(q)
-            if self._active is not None and self._active.run_id == run_id:
-                self._active.event_queues.append(q)
         return q
 
     def unsubscribe(self, run_id: int, q: queue.Queue[str]) -> None:
