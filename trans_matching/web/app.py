@@ -9,6 +9,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from trans_matching.storage.agent_repository import list_agent_runs
+from trans_matching.email import verify_gmail_connection
 from trans_matching.web.run_manager import run_manager
 from trans_matching.web.schemas import (
     RunListItemDTO,
@@ -143,6 +144,15 @@ async def stream_events(run_id: int) -> StreamingResponse:
 
 @app.get("/health")
 async def health() -> dict[str, str]:
+    return {"status": "ok"}
+
+
+@app.get("/api/gmail/verify")
+async def verify_gmail() -> dict[str, str]:
+    try:
+        verify_gmail_connection()
+    except (RuntimeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"status": "ok"}
 
 

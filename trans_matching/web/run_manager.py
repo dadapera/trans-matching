@@ -14,6 +14,7 @@ from trans_matching.llm_usage import reset_llm_usage
 from trans_matching.matchers.agent_models import AgentMatchResult
 from trans_matching.models import Transaction
 from trans_matching.openai_http import verify_openai_connection
+from trans_matching.email import verify_gmail_connection
 from trans_matching.storage.agent_repository import (
     create_agent_run,
     get_agent_run,
@@ -92,6 +93,11 @@ class RunManager:
         try:
             verify_openai_connection()
         except RuntimeError as exc:
+            raise RuntimeError(str(exc)) from exc
+
+        try:
+            verify_gmail_connection()
+        except (RuntimeError, ValueError) as exc:
             raise RuntimeError(str(exc)) from exc
 
         reset_llm_usage()
