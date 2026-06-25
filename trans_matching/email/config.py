@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass
 
 from dotenv import load_dotenv
@@ -8,6 +9,25 @@ from dotenv import load_dotenv
 from trans_matching.paths import ROOT
 
 load_dotenv(ROOT / ".env")
+
+_INVISIBLE_CHARS = re.compile(r"[\s\u200b\u200c\u200d\ufeff]+")
+
+
+def _strip_wrapping_quotes(value: str) -> str:
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+        return value[1:-1].strip()
+    return value
+
+
+def normalize_gmail_address(raw: str) -> str:
+    """Normalizza indirizzo Gmail da env (Render spesso incolla virgolette)."""
+    return _strip_wrapping_quotes(raw.strip()).lower()
+
+
+def normalize_gmail_app_password(raw: str) -> str:
+    """Normalizza app password: rimuove spazi e caratteri invisibili da copy-paste."""
+    value = _strip_wrapping_quotes(raw.strip())
+    return _INVISIBLE_CHARS.sub("", value)
 
 
 @dataclass(frozen=True)
@@ -20,20 +40,34 @@ class EmailConfig:
 
     @classmethod
     def from_env(cls) -> EmailConfig:
-        address = os.getenv("GMAIL_ADDRESS", "").strip()
-        app_password = os.getenv("GMAIL_APP_PASSWORD", "").strip()
+        address = normalize_gmail_address(os.getenv("GMAIL_ADDRESS", ""))
+        app_password = normalize_gmail_app_password(os.getenv("GMAIL_APP_PASSWORD", ""))
 
         if not address:
             raise ValueError("GMAIL_ADDRESS non configurato in .env")
         if not app_password:
             raise ValueError("GMAIL_APP_PASSWORD non configurato in .env")
+        if len(app_password) != 16:
+            raise ValueError(
+                "GMAIL_APP_PASSWORD deve essere una App Password Google di 16 caratteri "
+                f"(ricevuti {len(app_password)}). Genera una nuova password da "
+                "Account Google → Sicurezza → Password per le app."
+            )
+
+        imap_port_raw = _strip_wrapping_quotes(os.getenv("GMAIL_IMAP_PORT", "993").strip())
+        try:
+            imap_port = int(imap_port_raw)
+        except ValueError as exc:
+            raise ValueError(f"GMAIL_IMAP_PORT non valido: {imap_port_raw!r}") from exc
 
         return cls(
             address=address,
-            app_password=app_password.replace(" ", ""),
-            imap_host=os.getenv("GMAIL_IMAP_HOST", "imap.gmail.com").strip(),
-            imap_port=int(os.getenv("GMAIL_IMAP_PORT", "993")),
-            mailbox=os.getenv("GMAIL_MAILBOX", "INBOX").strip(),
+            app_password=app_password,
+            imap_host=_strip_wrapping_quotes(
+                os.getenv("GMAIL_IMAP_HOST", "imap.gmail.com").strip()
+            ),
+            imap_port=imap_port,
+            mailbox=_strip_wrapping_quotes(os.getenv("GMAIL_MAILBOX", "INBOX").strip()),
         )
 
 
