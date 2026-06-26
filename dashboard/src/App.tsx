@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import {
   fetchResults,
   fetchRunList,
@@ -40,8 +40,12 @@ export default function App() {
   const [results, setResults] = useState<MatchResultDTO[]>([]);
   const [filterTraceId, setFilterTraceId] = useState<string | null>(null);
   const [runList, setRunList] = useState<RunListItem[]>([]);
+  const [transactionRange, setTransactionRange] = useState<[number, number]>([1, 1]);
 
   const running = status === "running" || status === "stopping";
+  const transactionCount = cartaCount ?? 0;
+  const selectedTransactionCount =
+    transactionCount > 0 ? transactionRange[1] - transactionRange[0] + 1 : 0;
 
   const loadRun = useCallback(async (id: number) => {
     setRunId(id);
@@ -81,6 +85,14 @@ export default function App() {
   }, [refreshSession]);
 
   useEffect(() => {
+    if (!cartaCount || cartaCount < 1) {
+      setTransactionRange([1, 1]);
+      return;
+    }
+    setTransactionRange([1, cartaCount]);
+  }, [cartaCount]);
+
+  useEffect(() => {
     if (runId === null) return;
 
     const unsubscribe = subscribeRunEvents(
@@ -95,7 +107,7 @@ export default function App() {
             if (exists) return prev;
             return [...prev, result].sort((a, b) => a.row_number - b.row_number);
           });
-          setProcessed((p) => Math.max(p, result.row_number));
+          setProcessed((p) => Math.min(expected || p + 1, p + 1));
           if (result.matched) setMatchedCount((m) => m + 1);
         } else if (data.type === "run_progress") {
           setProcessed(data.processed as number);
@@ -133,7 +145,7 @@ export default function App() {
     );
 
     return unsubscribe;
-  }, [runId]);
+  }, [expected, runId]);
 
   const handleUploaded = (info: UploadResponse) => {
     setSessionReady(true);
@@ -142,20 +154,24 @@ export default function App() {
     setCartaCount(info.carta_count);
     setGestionaleCount(info.gestionale_count);
     setExpected(info.carta_count);
+    setTransactionRange([1, info.carta_count]);
     setError(null);
   };
 
   const handleStart = async () => {
     setError(null);
     try {
-      const { run_id } = await startRun();
+      const { run_id } = await startRun({
+        row_start: transactionRange[0],
+        row_end: transactionRange[1],
+      });
       setRunId(run_id);
       setStatus("running");
       setEvents([]);
       setResults([]);
       setProcessed(0);
       setMatchedCount(0);
-      if (cartaCount) setExpected(cartaCount);
+      if (selectedTransactionCount) setExpected(selectedTransactionCount);
       setTab("live");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Avvio fallito");
@@ -196,12 +212,18 @@ export default function App() {
             cartaCount={cartaCount}
             gestionaleCount={gestionaleCount}
           />
+          <TransactionRangePanel
+            total={transactionCount}
+            range={transactionRange}
+            disabled={running || transactionCount === 0}
+            onChange={setTransactionRange}
+          />
           <RunControls
             ready={sessionReady}
             running={running}
             runId={runId}
             processed={processed}
-            expected={expected}
+            expected={runId === null ? selectedTransactionCount : expected}
             matchedCount={matchedCount}
             status={status}
             onStart={handleStart}
@@ -233,6 +255,7 @@ export default function App() {
             {tab === "live" ? (
               <LiveFeed
                 events={events}
+                results={results}
                 filterTraceId={filterTraceId}
                 onFilterTrace={setFilterTraceId}
               />
@@ -249,5 +272,80 @@ export default function App() {
         </main>
       </div>
     </div>
+  );
+}
+
+function TransactionRangePanel({
+  total,
+  range,
+  disabled,
+  onChange,
+}: {
+  total: number;
+  range: [number, number];
+  disabled: boolean;
+  onChange: (range: [number, number]) => void;
+}) {
+  const [start, end] = range;
+  const selected = total > 0 ? end - start + 1 : 0;
+  const minPct = total > 1 ? ((start - 1) / (total - 1)) * 100 : 0;
+  const maxPct = total > 1 ? ((end - 1) / (total - 1)) * 100 : 100;
+
+  const updateStart = (value: number) => {
+    onChange([Math.min(value, end), end]);
+  };
+
+  const updateEnd = (value: number) => {
+    onChange([start, Math.max(value, start)]);
+  };
+
+  return (
+    <section className="panel txn-range">
+      <h2>Subset transazioni</h2>
+      {total > 0 ? (
+        <>
+          <div className="txn-range__meta">
+            <span>
+              Riga {start} - {end}
+            </span>
+            <span>{selected} selezionate</span>
+          </div>
+          <div
+            className="range-slider"
+            style={
+              {
+                "--range-start": `${minPct}%`,
+                "--range-end": `${maxPct}%`,
+              } as CSSProperties & Record<string, string>
+            }
+          >
+            <input
+              type="range"
+              min={1}
+              max={total}
+              value={start}
+              disabled={disabled}
+              aria-label="Prima transazione da analizzare"
+              onChange={(event) => updateStart(Number(event.target.value))}
+            />
+            <input
+              type="range"
+              min={1}
+              max={total}
+              value={end}
+              disabled={disabled}
+              aria-label="Ultima transazione da analizzare"
+              onChange={(event) => updateEnd(Number(event.target.value))}
+            />
+          </div>
+          <div className="txn-range__bounds">
+            <span>1</span>
+            <span>{total}</span>
+          </div>
+        </>
+      ) : (
+        <p className="hint-text">Carica la carta per scegliere il subset.</p>
+      )}
+    </section>
   );
 }

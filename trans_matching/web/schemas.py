@@ -57,6 +57,11 @@ class RunStartResponse(BaseModel):
     run_id: int
 
 
+class RunStartRequest(BaseModel):
+    row_start: int = Field(ge=1)
+    row_end: int = Field(ge=1)
+
+
 class RunStatusDTO(BaseModel):
     run_id: int
     status: str

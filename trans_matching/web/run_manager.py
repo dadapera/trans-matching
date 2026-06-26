@@ -81,7 +81,7 @@ class RunManager:
                 return None
             return self._active.run_id
 
-    def start_run(self) -> int:
+    def start_run(self, row_start: int | None = None, row_end: int | None = None) -> int:
         with self._lock:
             if self._active is not None and self._active.status == "running":
                 raise RuntimeError("Una analisi è già in corso")
@@ -89,6 +89,16 @@ class RunManager:
                 raise RuntimeError("Carica prima i file carta e gestionale")
 
             upload = self._upload
+
+        total_rows = len(upload.card_transactions)
+        start = row_start or 1
+        end = row_end or total_rows
+        if start > end:
+            raise RuntimeError("Subset transazioni non valido: inizio maggiore della fine")
+        if start < 1 or end > total_rows:
+            raise RuntimeError(f"Subset transazioni fuori range: scegli righe tra 1 e {total_rows}")
+
+        selected_card_transactions = upload.card_transactions[start - 1 : end]
 
         try:
             verify_openai_connection()
@@ -101,7 +111,8 @@ class RunManager:
             raise RuntimeError(str(exc)) from exc
 
         reset_llm_usage()
-        run_id = create_agent_run(len(upload.card_transactions))
+        expected_transactions = len(selected_card_transactions)
+        run_id = create_agent_run(expected_transactions)
         cancel_event = threading.Event()
 
         def on_event(record: dict[str, Any]) -> None:
@@ -134,13 +145,14 @@ class RunManager:
             error_message: str | None = None
             try:
                 results, _, run_logger = run_agent_matching(
-                    upload.card_transactions,
+                    selected_card_transactions,
                     upload.gestionale_transactions,
                     run_id=run_id,
                     logger=logger,
                     cancel_event=cancel_event,
                     on_result=on_result,
                     progress_callback=progress_callback,
+                    row_offset=start - 1,
                     quiet=True,
                     save_at_end=False,
                 )
@@ -164,7 +176,7 @@ class RunManager:
                         "status": final_status,
                         "matched": matched,
                         "processed": len(results),
-                        "expected": len(upload.card_transactions),
+                        "expected": expected_transactions,
                         "elapsed_seconds": round(elapsed, 2),
                     },
                 )

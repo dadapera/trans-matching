@@ -1,6 +1,7 @@
 import type {
   MatchResultDTO,
   RunListItem,
+  RunStartRequest,
   RunStatus,
   SessionInfo,
   UploadResponse,
@@ -33,8 +34,12 @@ export async function uploadFiles(carta: File, gestionale: File): Promise<Upload
   return request<UploadResponse>("/api/session/upload", { method: "POST", body: form });
 }
 
-export async function startRun(): Promise<{ run_id: number }> {
-  return request<{ run_id: number }>("/api/runs", { method: "POST" });
+export async function startRun(options: RunStartRequest): Promise<{ run_id: number }> {
+  return request<{ run_id: number }>("/api/runs", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(options),
+  });
 }
 
 export async function stopRun(runId: number): Promise<void> {

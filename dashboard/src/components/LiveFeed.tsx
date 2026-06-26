@@ -1,18 +1,26 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
   Bot,
   CheckCircle2,
   GitBranch,
   HelpCircle,
+  Mail,
   Wrench,
 } from "lucide-react";
-import type { AgentEvent } from "../types";
+import type { AgentEvent, MatchResultDTO } from "../types";
 
 interface Props {
   events: AgentEvent[];
+  results: MatchResultDTO[];
   filterTraceId: string | null;
   onFilterTrace: (traceId: string | null) => void;
+}
+
+interface TraceGroup {
+  traceId: string;
+  events: AgentEvent[];
+  result?: MatchResultDTO;
 }
 
 const LIVE_EVENTS = new Set([
@@ -21,6 +29,9 @@ const LIVE_EVENTS = new Set([
   "tool_call",
   "agent_step",
   "confidence_gate",
+  "email_search",
+  "llm_call",
+  "pool_update",
   "router_classify",
   "rate_limit_retry",
   "error",
@@ -30,36 +41,93 @@ const LIVE_EVENTS = new Set([
   "run_error",
 ]);
 
-export function LiveFeed({ events, filterTraceId, onFilterTrace }: Props) {
+export function LiveFeed({ events, results, filterTraceId, onFilterTrace }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const [debugMode, setDebugMode] = useState(false);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [events.length]);
+  }, [events.length, results.length]);
 
-  const filtered = events.filter((ev) => {
-    const name = (ev.event ?? ev.type) as string;
-    if (!LIVE_EVENTS.has(name) && ev.type !== "agent_event") return false;
-    if (filterTraceId && ev.trace_id && ev.trace_id !== filterTraceId) return false;
-    return true;
+  const systemEvents = events.filter((ev) => {
+    const name = eventName(ev);
+    return !ev.trace_id && LIVE_EVENTS.has(name);
   });
+
+  const traces = useMemo(() => {
+    const groups = new Map<string, TraceGroup>();
+
+    for (const event of events) {
+      const name = eventName(event);
+      const traceId = event.trace_id;
+      if (!traceId || (!LIVE_EVENTS.has(name) && event.type !== "agent_event")) continue;
+
+      const group = groups.get(traceId) ?? { traceId, events: [] };
+      group.events.push(event);
+      groups.set(traceId, group);
+    }
+
+    for (const result of results) {
+      const group = groups.get(result.trace_id) ?? { traceId: result.trace_id, events: [] };
+      group.result = result;
+      groups.set(result.trace_id, group);
+    }
+
+    return Array.from(groups.values())
+      .filter((group) => !filterTraceId || group.traceId === filterTraceId)
+      .sort((a, b) => traceSortKey(a) - traceSortKey(b));
+  }, [events, filterTraceId, results]);
 
   return (
     <div className="live-feed">
-      {filterTraceId && (
-        <div className="filter-bar">
-          Filtro: <code>{filterTraceId}</code>
-          <button type="button" className="link-btn" onClick={() => onFilterTrace(null)}>
-            Rimuovi
+      <div className="live-feed__toolbar">
+        {filterTraceId ? (
+          <div className="filter-bar">
+            Focus: <code>{filterTraceId}</code>
+            <button type="button" className="link-btn" onClick={() => onFilterTrace(null)}>
+              Mostra tutte
+            </button>
+          </div>
+        ) : (
+          <span className="live-feed__hint">Monitoraggio aggregato per transazione</span>
+        )}
+        <div className="mode-switch" aria-label="Modalita log">
+          <button
+            type="button"
+            className={`mode-switch__btn ${!debugMode ? "mode-switch__btn--active" : ""}`}
+            onClick={() => setDebugMode(false)}
+          >
+            Normale
+          </button>
+          <button
+            type="button"
+            className={`mode-switch__btn ${debugMode ? "mode-switch__btn--active" : ""}`}
+            onClick={() => setDebugMode(true)}
+          >
+            Debug
           </button>
         </div>
-      )}
+      </div>
+
       <div className="live-feed__list">
-        {filtered.length === 0 && (
+        {systemEvents.length > 0 && !filterTraceId && (
+          <div className="run-events">
+            {systemEvents.map((event, i) => (
+              <RunEvent key={`${event.ts ?? eventName(event)}-${i}`} event={event} />
+            ))}
+          </div>
+        )}
+        {traces.length === 0 && (
           <p className="empty-state">Gli eventi dell&apos;agente appariranno qui in tempo reale.</p>
         )}
-        {filtered.map((ev, i) => (
-          <EventLine key={`${ev.ts}-${i}`} event={ev} onFilterTrace={onFilterTrace} />
+        {traces.map((trace) => (
+          <TraceCard
+            key={trace.traceId}
+            trace={trace}
+            debugMode={debugMode}
+            focused={trace.traceId === filterTraceId}
+            onFilterTrace={onFilterTrace}
+          />
         ))}
         <div ref={bottomRef} />
       </div>
@@ -67,43 +135,157 @@ export function LiveFeed({ events, filterTraceId, onFilterTrace }: Props) {
   );
 }
 
-function EventLine({
-  event,
+function TraceCard({
+  trace,
+  debugMode,
+  focused,
   onFilterTrace,
 }: {
-  event: AgentEvent;
+  trace: TraceGroup;
+  debugMode: boolean;
+  focused: boolean;
   onFilterTrace: (id: string | null) => void;
 }) {
-  const name = (event.event ?? event.type) as string;
-  const icon = eventIcon(name, event);
-  const summary = formatEvent(name, event);
+  const start = trace.events.find((event) => eventName(event) === "txn_start");
+  const end = trace.events.find((event) => eventName(event) === "txn_end");
+  const error = trace.events.find((event) => eventName(event) === "error");
+  const title = transactionTitle(start, trace.result);
+  const outcome = trace.result ? outcomeKey(trace.result) : error ? "error" : end ? "done" : "running";
 
   return (
-    <div className={`event-line event-line--${eventClass(name, event)}`}>
-      <span className="event-line__icon">{icon}</span>
-      <div className="event-line__body">
-        <div className="event-line__head">
-          <span className="event-line__type">{name}</span>
-          {event.trace_id && (
+    <article className={`trace-card trace-card--${outcome} ${focused ? "trace-card--focused" : ""}`}>
+      <header className="trace-card__header">
+        <div>
+          <div className="trace-card__eyebrow">
             <button
               type="button"
               className="trace-chip"
-              onClick={() => onFilterTrace(event.trace_id!)}
+              onClick={() => onFilterTrace(focused ? null : trace.traceId)}
             >
-              {event.trace_id}
+              {trace.traceId}
             </button>
-          )}
-          {event.ts && <time className="event-line__time">{formatTime(event.ts)}</time>}
+            {start?.ts && <time>{formatTime(start.ts)}</time>}
+          </div>
+          <h3>{title}</h3>
+          <p>{transactionMeta(start, trace.result)}</p>
         </div>
-        <p className="event-line__summary">{summary}</p>
+        <span className={`trace-status trace-status--${outcome}`}>{statusLabel(trace, error)}</span>
+      </header>
+
+      <div className="trace-timeline">
+        {buildSteps(trace).map((step, index) => (
+          <TraceStep key={`${step.event.ts ?? step.name}-${index}`} step={step} debugMode={debugMode} />
+        ))}
+        {trace.result && <ResultStep result={trace.result} debugMode={debugMode} />}
+      </div>
+    </article>
+  );
+}
+
+function TraceStep({ step, debugMode }: { step: TraceStepData; debugMode: boolean }) {
+  const icon = eventIcon(step.name, step.event);
+  const details = stepDetails(step.event, debugMode);
+
+  return (
+    <div className={`trace-step trace-step--${eventClass(step.name, step.event)}`}>
+      <span className="trace-step__icon">{icon}</span>
+      <div className="trace-step__body">
+        <div className="trace-step__head">
+          <span>{step.title}</span>
+          {step.event.ts && <time>{formatTime(step.event.ts)}</time>}
+        </div>
+        {step.summary && <p>{step.summary}</p>}
+        {details && (
+          <details className="trace-details">
+            <summary>{debugMode ? "Log raw" : "Dettagli"}</summary>
+            <pre>{details}</pre>
+          </details>
+        )}
       </div>
     </div>
   );
 }
 
+function ResultStep({ result, debugMode }: { result: MatchResultDTO; debugMode: boolean }) {
+  return (
+    <div className={`trace-step trace-step--result trace-step--${outcomeKey(result)}`}>
+      <span className="trace-step__icon">
+        {result.matched ? <CheckCircle2 size={16} /> : <HelpCircle size={16} />}
+      </span>
+      <div className="trace-step__body">
+        <div className="trace-step__head">
+          <span>Risultato: {result.matched ? "match" : result.ambiguous ? "ambiguo" : "nessun match"}</span>
+          <span className={`conf conf--${result.confidence}`}>{result.confidence}</span>
+        </div>
+        <p>{result.reason || "Nessun razionale disponibile."}</p>
+        <details className="trace-details">
+          <summary>Apri info e razionale</summary>
+          <div className="result-detail">
+            <strong>Strategia</strong>
+            <p>{result.strategy || "-"}</p>
+            <strong>Gestionale</strong>
+            {result.gestionale.length > 0 ? (
+              result.gestionale.map((item) => (
+                <p key={item.identificativo || item.description}>
+                  {item.identificativo || "-"} · {item.description} · €{item.amount}
+                </p>
+              ))
+            ) : (
+              <p>-</p>
+            )}
+            {result.alternatives.length > 0 && (
+              <>
+                <strong>Alternative</strong>
+                {result.alternatives.map((alt) => (
+                  <p key={`${alt.identificativi.join(",")}-${alt.reason}`}>
+                    {alt.identificativi.join(", ") || "-"} · {alt.confidence} · {alt.reason}
+                  </p>
+                ))}
+              </>
+            )}
+            {debugMode && <pre>{formatJson(result)}</pre>}
+          </div>
+        </details>
+      </div>
+    </div>
+  );
+}
+
+function RunEvent({ event }: { event: AgentEvent }) {
+  const name = eventName(event);
+  return (
+    <div className={`run-event run-event--${eventClass(name, event)}`}>
+      <span>{formatEvent(name, event)}</span>
+      {event.ts && <time>{formatTime(event.ts)}</time>}
+    </div>
+  );
+}
+
+interface TraceStepData {
+  name: string;
+  title: string;
+  summary: string;
+  event: AgentEvent;
+}
+
+function buildSteps(trace: TraceGroup): TraceStepData[] {
+  return trace.events
+    .filter((event) => eventName(event) !== "txn_end")
+    .map((event) => {
+      const name = eventName(event);
+      return {
+        name,
+        title: stepTitle(name, event),
+        summary: stepSummary(name, event),
+        event,
+      };
+    });
+}
+
 function eventIcon(name: string, event: AgentEvent) {
   if (name === "error" || name === "run_error") return <AlertCircle size={16} />;
   if (name === "tool_call") return <Wrench size={16} />;
+  if (name === "email_search") return <Mail size={16} />;
   if (name === "agent_step") return <Bot size={16} />;
   if (name === "confidence_gate" || name === "txn_end") {
     return event.matched ? <CheckCircle2 size={16} /> : <HelpCircle size={16} />;
@@ -121,8 +303,14 @@ function eventClass(name: string, event: AgentEvent): string {
   return "default";
 }
 
+function eventName(event: AgentEvent): string {
+  return (event.event ?? event.type ?? "unknown") as string;
+}
+
 function formatEvent(name: string, event: AgentEvent): string {
   switch (name) {
+    case "run_started":
+      return "Run avviata";
     case "txn_start":
       return `#${event.row_number} ${String(event.card_description ?? "").slice(0, 60)} — €${event.card_amount}`;
     case "txn_end":
@@ -149,7 +337,7 @@ function formatEvent(name: string, event: AgentEvent): string {
     case "run_finished":
       return `Fine run — ${event.matched}/${event.processed} match`;
     case "run_stopping":
-      return "Arresto richiesto, attendo fine transazione corrente…";
+      return "Arresto richiesto, attendo fine transazione corrente...";
     default:
       return JSON.stringify(
         Object.fromEntries(
@@ -159,10 +347,100 @@ function formatEvent(name: string, event: AgentEvent): string {
   }
 }
 
+function stepTitle(name: string, event: AgentEvent): string {
+  switch (name) {
+    case "txn_start":
+      return `Sto analizzando la transazione #${event.row_number ?? "?"}`;
+    case "router_classify":
+      return `Classifico la transazione: ${event.category ?? "categoria non definita"}`;
+    case "tool_call":
+      return `Uso tool ${String(event.tool ?? "tool")}`;
+    case "email_search":
+      return `Cerco email ${String(event.provider ?? "")}`.trim();
+    case "agent_step":
+      return event.action === "finish"
+        ? "L'agente prepara la decisione"
+        : `L'agente valuta il prossimo passo${event.action ? `: ${String(event.action)}` : ""}`;
+    case "confidence_gate":
+      return "Valuto la confidence e applico la soglia";
+    case "rate_limit_retry":
+      return "Retry per rate limit";
+    case "pool_update":
+      return "Aggiorno il pool gestionale";
+    case "llm_call":
+      return "Chiamata LLM completata";
+    case "error":
+      return "Errore durante l'analisi";
+    default:
+      return name;
+  }
+}
+
+function stepSummary(name: string, event: AgentEvent): string {
+  switch (name) {
+    case "txn_start":
+      return `${event.card_date ?? "-"} · ${event.card_description ?? "-"} · €${event.card_amount ?? "-"}`;
+    case "router_classify":
+      return `Uso questa categoria per scegliere strategia e tool più adatti.`;
+    case "tool_call": {
+      const phase = event.phase as string | undefined;
+      if (phase === "start") return "Il tool è stato invocato; i dettagli sono disponibili cliccando.";
+      return compactToolSummary(event.output_summary);
+    }
+    case "email_search":
+      return `${event.results ?? 0} email trovate per la ricerca.`;
+    case "agent_step":
+      return "Sintesi: l'agente sta confrontando evidenze, candidati e vincoli prima della decisione finale.";
+    case "confidence_gate":
+      return `Decisione preliminare: ${event.matched ? "match" : "no match"} con confidence ${event.confidence ?? "-"}.`;
+    case "rate_limit_retry":
+      return `Tentativo ${event.attempt ?? "?"}: riprovo tra ${event.wait_seconds ?? "?"}s.`;
+    case "pool_update":
+      return `${event.assigned ?? 0} righe assegnate, ${event.available ?? "?"} ancora disponibili.`;
+    case "llm_call":
+      return `${event.model ?? "modello"} · ${event.duration_ms ?? "?"}ms · ${event.prompt_tokens ?? 0}/${event.completion_tokens ?? 0} token.`;
+    case "error":
+      return String(event.error ?? "Errore sconosciuto");
+    default:
+      return formatEvent(name, event);
+  }
+}
+
+function stepDetails(event: AgentEvent, debugMode: boolean): string | null {
+  const name = eventName(event);
+  if (debugMode) return formatJson(event);
+  if (name === "tool_call") {
+    return formatJson({
+      input: event.input,
+      output_summary: event.output_summary,
+      duration_ms: event.duration_ms,
+    });
+  }
+  if (name === "email_search") {
+    return formatJson({
+      provider: event.provider,
+      query: event.query,
+      keyword: event.keyword,
+      from_address: event.from_address,
+      results: event.results,
+    });
+  }
+  return null;
+}
+
 function formatSummary(value: unknown): string {
   if (value === null || value === undefined) return "";
   if (typeof value === "string") return value;
   return JSON.stringify(value);
+}
+
+function compactToolSummary(value: unknown): string {
+  const text = formatSummary(value);
+  return text ? text.slice(0, 180) : "Tool completato.";
+}
+
+function formatJson(value: unknown): string {
+  return JSON.stringify(value, null, 2);
 }
 
 function formatTime(iso: string): string {
@@ -171,4 +449,39 @@ function formatTime(iso: string): string {
   } catch {
     return iso;
   }
+}
+
+function traceSortKey(group: TraceGroup): number {
+  const row = group.result?.row_number ?? group.events.find((event) => event.row_number)?.row_number;
+  if (typeof row === "number") return row;
+  const firstTime = group.events[0]?.ts;
+  return firstTime ? new Date(firstTime).getTime() : Number.MAX_SAFE_INTEGER;
+}
+
+function transactionTitle(start: AgentEvent | undefined, result: MatchResultDTO | undefined): string {
+  const row = result?.row_number ?? start?.row_number ?? "?";
+  const description = result?.card.description ?? start?.card_description ?? "Transazione";
+  return `Transazione #${row} · ${String(description).slice(0, 90)}`;
+}
+
+function transactionMeta(start: AgentEvent | undefined, result: MatchResultDTO | undefined): string {
+  const date = result?.card.date ?? start?.card_date ?? "-";
+  const amount = result?.card.amount ?? start?.card_amount ?? "-";
+  const category = start?.category ? ` · ${start.category}` : "";
+  return `${date} · €${amount}${category}`;
+}
+
+function statusLabel(trace: TraceGroup, error: AgentEvent | undefined): string {
+  if (error) return "Errore";
+  if (trace.result?.matched) return "Match";
+  if (trace.result?.ambiguous) return "Ambiguo";
+  if (trace.result) return "No match";
+  if (trace.events.some((event) => eventName(event) === "txn_end")) return "Completata";
+  return "In corso";
+}
+
+function outcomeKey(result: MatchResultDTO): string {
+  if (result.matched) return "matched";
+  if (result.ambiguous) return "ambiguous";
+  return "unmatched";
 }

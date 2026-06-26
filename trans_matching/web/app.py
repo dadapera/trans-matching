@@ -13,6 +13,7 @@ from trans_matching.email import verify_gmail_connection
 from trans_matching.web.run_manager import run_manager
 from trans_matching.web.schemas import (
     RunListItemDTO,
+    RunStartRequest,
     RunStartResponse,
     RunStatusDTO,
     UploadResponse,
@@ -53,9 +54,12 @@ async def upload_session(
 
 
 @app.post("/api/runs", response_model=RunStartResponse)
-async def start_run() -> RunStartResponse:
+async def start_run(request: RunStartRequest | None = None) -> RunStartResponse:
     try:
-        run_id = run_manager.start_run()
+        run_id = run_manager.start_run(
+            row_start=request.row_start if request else None,
+            row_end=request.row_end if request else None,
+        )
     except RuntimeError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return RunStartResponse(run_id=run_id)

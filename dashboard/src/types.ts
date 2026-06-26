@@ -41,6 +41,11 @@ export interface SessionInfo {
   active_run_id?: number | null;
 }
 
+export interface RunStartRequest {
+  row_start: number;
+  row_end: number;
+}
+
 export interface RunStatus {
   run_id: number;
   status: string;

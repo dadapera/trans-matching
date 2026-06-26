@@ -29,6 +29,7 @@ def run_agent_matching(
     cancel_event: threading.Event | None = None,
     on_result: Callable[[AgentMatchResult], None] | None = None,
     progress_callback: Callable[[int, int], None] | None = None,
+    row_offset: int = 0,
     quiet: bool = False,
     save_at_end: bool = True,
 ) -> tuple[list[AgentMatchResult], int, AgentRunLogger]:
@@ -69,6 +70,7 @@ def run_agent_matching(
             iterator = tqdm(card_txns, desc="Agent matching", unit="txn")
 
         for index, card in enumerate(iterator, start=1):
+            row_number = row_offset + index
             if cancel_event is not None and cancel_event.is_set():
                 stopped_early = True
                 break
@@ -81,24 +83,24 @@ def run_agent_matching(
             elif not quiet and hasattr(iterator, "set_postfix_str"):
                 iterator.set_postfix_str(card.description[:40])
 
-            trace_id = f"run-{provisional_run_id}-txn-{index:03d}"
+            trace_id = f"run-{provisional_run_id}-txn-{row_number:03d}"
             session = MatchSession(
                 pool=pool,
                 reader=reader,
                 logger=run_logger,
                 run_id=provisional_run_id,
-                row_number=index,
+                row_number=row_number,
                 card=card,
                 trace_id=trace_id,
                 date_window_days=agent_config.date_window_days,
             )
             result = match_one(session)
-            result.row_number = index
+            result.row_number = row_number
             result.trace_id = trace_id
             if result.matched:
                 assigned = pool.assign(
                     result.gestionale,
-                    card_row_number=index,
+                    card_row_number=row_number,
                     confidence=result.confidence,
                 )
                 run_logger.log(
