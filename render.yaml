@@ -59,5 +59,3 @@ services:
         value: "false"
       - key: MSC_EMAIL_FROM
         value: msc-booking.no-reply@msccrociere.it
-      - key: MSC_MAX_EMAILS
-        value: "10"

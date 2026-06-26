@@ -9,7 +9,15 @@ from trans_matching.parsers.common import format_italian_date
 
 def parse_transaction_date(value: str) -> datetime | None:
     normalized = format_italian_date(value)
-    for fmt in ("%d/%m/%Y", "%d/%m/%y"):
+    for fmt in (
+        "%d/%m/%Y",
+        "%d/%m/%y",
+        "%Y-%m-%d",
+        "%m/%d/%Y",
+        "%m/%d/%y",
+        "%m-%d-%Y",
+        "%m-%d-%y",
+    ):
         try:
             return datetime.strptime(normalized, fmt)
         except ValueError:

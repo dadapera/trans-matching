@@ -422,6 +422,9 @@ function stepDetails(event: AgentEvent, debugMode: boolean): string | null {
       query: event.query,
       keyword: event.keyword,
       from_address: event.from_address,
+      search_date: event.search_date,
+      date_from: event.date_from,
+      date_to: event.date_to,
       results: event.results,
     });
   }

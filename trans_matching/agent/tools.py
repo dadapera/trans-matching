@@ -125,17 +125,16 @@ def search_expedia(booking_code: str = "") -> str:
 
 
 @tool
-def search_msc(payment_date: str = "", amount: float | None = None) -> str:
-    """Cerca email MSC per mittente e range data intorno al pagamento."""
+def search_msc(search_date: str = "") -> str:
+    """Cerca tutte le email MSC per mittente nel range ±7 giorni dalla data indicata."""
     session = get_session()
     started = time.perf_counter()
     config = get_msc_email_config()
-    pay_date = payment_date.strip() or session.card.date
-    card_amount = amount if amount is not None else float(session.card.amount)
-    window_start, window_end = date_window_bounds(pay_date, days=_MSC_EMAIL_WINDOW_DAYS)
+    target_date = search_date.strip() or session.card.date
+    window_start, window_end = date_window_bounds(target_date, days=_MSC_EMAIL_WINDOW_DAYS)
 
     if window_start is None or window_end is None:
-        payload = {"error": f"Data pagamento MSC non valida: {pay_date!r}"}
+        payload = {"error": f"Data ricerca MSC non valida: {target_date!r}"}
         _log_tool(session, "search_msc", payload, started)
         return json.dumps(payload, ensure_ascii=False)
 
@@ -146,14 +145,13 @@ def search_msc(payment_date: str = "", amount: float | None = None) -> str:
             since=window_start.date(),
             before=(window_end + timedelta(days=1)).date(),
             include_body=True,
-            max_results=config.max_emails,
         )
         session.logger.log(
             "email_search",
             trace_id=session.trace_id,
             provider="msc",
             from_address=from_address,
-            payment_date=pay_date,
+            search_date=target_date,
             date_from=window_start.date().isoformat(),
             date_to=window_end.date().isoformat(),
             results=len(emails),
@@ -169,23 +167,15 @@ def search_msc(payment_date: str = "", amount: float | None = None) -> str:
                 }
             )
 
-    gestionale_hits = session.pool.search(
-        text="MSC",
-        amount=Decimal(str(card_amount)),
-        card_date=pay_date,
-        date_window_days=_MSC_EMAIL_WINDOW_DAYS,
-        limit=10,
-    )
     payload = {
         "parser_status": "stub",
-        "payment_date": pay_date,
+        "search_date": target_date,
         "date_window_days": _MSC_EMAIL_WINDOW_DAYS,
         "emails_scanned": len(collected),
-        "emails": collected[: config.max_emails],
-        "gestionale_candidates": [session.pool.format_row(txn) for txn in gestionale_hits],
+        "emails": collected,
         "note": "Parser MSC incompleto: affinare MSC_EMAIL_FROM e campi email quando disponibili.",
     }
-    _log_tool(session, "search_msc", {"emails": len(collected), "candidates": len(gestionale_hits)}, started)
+    _log_tool(session, "search_msc", {"emails": len(collected)}, started)
     return json.dumps(payload, ensure_ascii=False)
 
 
