@@ -6,7 +6,7 @@ import ssl
 from email.header import decode_header
 from email.message import Message
 
-from trans_matching.email.config import EmailConfig, get_email_config
+from trans_matching.email.config import EmailConfig, get_email_config, get_imap_ssl_context
 from trans_matching.email.models import EmailMessage, EmailSearchQuery
 
 _GMAIL_AUTH_HINT = (
@@ -29,6 +29,15 @@ def _is_auth_failure(exc: BaseException) -> bool:
     return "AUTHENTICATIONFAILED" in text or "INVALID CREDENTIALS" in text
 
 
+def _imap_ssl_error_message(exc: BaseException, config: EmailConfig) -> str:
+    return (
+        f"Impossibile raggiungere {config.imap_host}:{config.imap_port}: {exc}. "
+        "Su Windows con proxy/antivirus che intercettano HTTPS, prova in .env: "
+        "GMAIL_VERIFY_SSL=false (oppure GMAIL_CA_BUNDLE=percorso/certificato-root.pem). "
+        "Se GMAIL_VERIFY_SSL non è impostato, vale anche OPENAI_VERIFY_SSL."
+    )
+
+
 def verify_gmail_connection(config: EmailConfig | None = None) -> None:
     """Verifica login IMAP Gmail prima di avviare l'analisi."""
     cfg = config or get_email_config()
@@ -37,6 +46,8 @@ def verify_gmail_connection(config: EmailConfig | None = None) -> None:
         reader.connect()
     except imaplib.IMAP4.error as exc:
         raise RuntimeError(_imap_auth_error_message(exc, cfg)) from exc
+    except ssl.SSLError as exc:
+        raise RuntimeError(_imap_ssl_error_message(exc, cfg)) from exc
     except OSError as exc:
         raise RuntimeError(
             f"Impossibile raggiungere {cfg.imap_host}:{cfg.imap_port}: {exc}"
@@ -114,7 +125,7 @@ class GmailReader:
     def connect(self) -> None:
         if self._mail is not None:
             return
-        ssl_context = ssl.create_default_context()
+        ssl_context = get_imap_ssl_context()
         self._mail = imaplib.IMAP4_SSL(
             self._config.imap_host,
             self._config.imap_port,

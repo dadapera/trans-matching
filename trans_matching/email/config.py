@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import re
+import ssl
 from dataclasses import dataclass
 
 from dotenv import load_dotenv
@@ -73,3 +74,28 @@ class EmailConfig:
 
 def get_email_config() -> EmailConfig:
     return EmailConfig.from_env()
+
+
+def get_imap_ssl_context() -> ssl.SSLContext:
+    """SSL per IMAP Gmail.
+
+    Default: verifica certificati attiva. Con proxy/antivirus su Windows spesso
+    serve GMAIL_CA_BUNDLE (cert root aziendale) o GMAIL_VERIFY_SSL=false.
+    Se GMAIL_* non è impostato, riusa OPENAI_CA_BUNDLE / OPENAI_VERIFY_SSL.
+    """
+    ca_bundle = (
+        _strip_wrapping_quotes(os.getenv("GMAIL_CA_BUNDLE", "").strip())
+        or _strip_wrapping_quotes(os.getenv("OPENAI_CA_BUNDLE", "").strip())
+    )
+    if ca_bundle:
+        return ssl.create_default_context(cafile=ca_bundle)
+
+    raw = _strip_wrapping_quotes(os.getenv("GMAIL_VERIFY_SSL", "").strip()).lower()
+    if not raw:
+        raw = _strip_wrapping_quotes(os.getenv("OPENAI_VERIFY_SSL", "true").strip()).lower()
+    if raw in {"0", "false", "no", "off"}:
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        return ctx
+    return ssl.create_default_context()

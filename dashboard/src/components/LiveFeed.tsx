@@ -133,7 +133,7 @@ function formatEvent(name: string, event: AgentEvent): string {
       const tool = event.tool as string | undefined;
       const phase = event.phase as string | undefined;
       if (phase === "start") return `→ ${tool}`;
-      return `← ${tool}: ${String(event.output_summary ?? "").slice(0, 120)}`;
+      return `← ${tool ?? "tool"}: ${formatSummary(event.output_summary).slice(0, 120)}`;
     }
     case "agent_step":
       return String(event.log ?? event.action ?? "").slice(0, 300);
@@ -157,6 +157,12 @@ function formatEvent(name: string, event: AgentEvent): string {
         ),
       ).slice(0, 200);
   }
+}
+
+function formatSummary(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string") return value;
+  return JSON.stringify(value);
 }
 
 function formatTime(iso: string): string {

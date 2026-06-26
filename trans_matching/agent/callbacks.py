@@ -58,15 +58,7 @@ class AgentTraceCallback(BaseCallbackHandler):
         parent_run_id: Any = None,
         **kwargs: Any,
     ) -> None:
-        started = self._tool_start.pop(str(run_id), None)
-        duration_ms = int((time.perf_counter() - started) * 1000) if started else None
-        self._logger().log(
-            "tool_call",
-            trace_id=self._trace_id(),
-            phase="end",
-            output_summary=_truncate(output),
-            duration_ms=duration_ms,
-        )
+        self._tool_start.pop(str(run_id), None)
 
     def on_tool_error(
         self,
