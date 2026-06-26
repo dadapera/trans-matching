@@ -31,3 +31,10 @@ class AgentMatchResult:
     @property
     def is_matched(self) -> bool:
         return self.matched
+
+    @property
+    def is_ambiguous(self) -> bool:
+        return not self.matched and any(
+            alternative.confidence in ("alto", "medio")
+            for alternative in self.alternatives
+        )

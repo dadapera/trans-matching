@@ -27,7 +27,7 @@ def main() -> None:
     generate_agent_html_report(REPORT_AGENT, run_id=run_id)
 
     matched = sum(1 for result in results if result.matched)
-    ambiguous = sum(1 for result in results if not result.matched and result.alternatives)
+    ambiguous = sum(1 for result in results if result.is_ambiguous)
 
     print(f"Transazioni carta:       {len(results)}")
     print(f"Match:                   {matched}/{len(results)}")

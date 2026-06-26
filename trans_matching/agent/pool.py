@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from decimal import Decimal
 
@@ -27,7 +28,33 @@ class GestionalePool:
 
     @staticmethod
     def _key(txn: Transaction) -> str:
-        return txn.identificativo or f"{txn.date}|{txn.description}|{txn.amount}"
+        return txn.identificativo or GestionalePool._row_signature(txn)
+
+    @staticmethod
+    def _row_signature(txn: Transaction) -> str:
+        return f"{txn.date}|{txn.amount}|{txn.description}"
+
+    @staticmethod
+    def _normalize_identifier(value: str) -> str:
+        compact_pipes = re.sub(r"\s*\|\s*", "|", value.strip())
+        return " ".join(compact_pipes.upper().split())
+
+    @staticmethod
+    def _identifier_aliases(txn: Transaction) -> set[str]:
+        aliases = {
+            GestionalePool._row_signature(txn),
+            f"{txn.identificativo}|{txn.date}|{txn.amount}|{txn.description}",
+            f"{txn.date}|{txn.description}|{txn.amount}",
+        }
+        if txn.identificativo:
+            aliases.add(txn.identificativo)
+        else:
+            aliases.add(f"|{GestionalePool._row_signature(txn)}")
+        return {
+            normalized
+            for alias in aliases
+            if (normalized := GestionalePool._normalize_identifier(alias))
+        }
 
     @property
     def total(self) -> int:
@@ -79,11 +106,14 @@ class GestionalePool:
         return False
 
     def find_by_identificativi(self, identificativi: list[str]) -> list[Transaction]:
-        targets = {value.strip().upper() for value in identificativi if value.strip()}
+        targets = {
+            normalized
+            for value in identificativi
+            if (normalized := self._normalize_identifier(value))
+        }
         found: list[Transaction] = []
         for txn in self._all:
-            ident = txn.identificativo.strip().upper()
-            if ident in targets:
+            if self._identifier_aliases(txn) & targets:
                 found.append(txn)
         return found
 

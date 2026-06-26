@@ -54,9 +54,10 @@ def _agent_detail(result: AgentMatchResult) -> str:
                 f"{_html_escape(ids)} ({alt.confidence}): "
                 f"{_html_escape(alt.reason or alt.gestionale_preview)}"
             )
+        label = "In bilico tra:" if result.is_ambiguous else "Alternative valutate:"
         parts.append(
             '<span class="alternatives">'
-            '<span class="alternatives-label">In bilico tra:</span> '
+            f'<span class="alternatives-label">{label}</span> '
             + "<br>".join(alt_lines)
             + "</span>"
         )
@@ -92,7 +93,7 @@ def generate_agent_html_report(
         raise ValueError("run è richiesto quando si passano results in memoria")
 
     matched = sum(1 for result in results if result.matched)
-    ambiguous = sum(1 for result in results if not result.matched and result.alternatives)
+    ambiguous = sum(1 for result in results if result.is_ambiguous)
     unmatched = len(results) - matched
 
     rows: list[str] = []
@@ -102,7 +103,7 @@ def generate_agent_html_report(
             icon = "✅"
             row_class = "match"
             status_text = "Match"
-        elif result.alternatives:
+        elif result.is_ambiguous:
             icon = "⚠️"
             row_class = "ambiguous"
             status_text = "Ambiguo"

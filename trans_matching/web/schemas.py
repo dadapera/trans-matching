@@ -103,7 +103,6 @@ def _alt_to_dto(alt: MatchAlternative) -> MatchAlternativeDTO:
 
 
 def match_result_to_dto(result: AgentMatchResult) -> MatchResultDTO:
-    ambiguous = not result.matched and bool(result.alternatives)
     return MatchResultDTO(
         row_number=result.row_number,
         trace_id=result.trace_id,
@@ -114,7 +113,7 @@ def match_result_to_dto(result: AgentMatchResult) -> MatchResultDTO:
         card=_txn_to_dto(result.card),
         gestionale=[_txn_to_dto(txn) for txn in result.gestionale],
         alternatives=[_alt_to_dto(alt) for alt in result.alternatives],
-        ambiguous=ambiguous,
+        ambiguous=result.is_ambiguous,
     )
 
 
