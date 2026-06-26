@@ -37,6 +37,7 @@ class EmailConfig:
     app_password: str
     imap_host: str
     imap_port: int
+    imap_timeout_seconds: float
     mailbox: str
 
     @classmethod
@@ -60,6 +61,15 @@ class EmailConfig:
             imap_port = int(imap_port_raw)
         except ValueError as exc:
             raise ValueError(f"GMAIL_IMAP_PORT non valido: {imap_port_raw!r}") from exc
+        imap_timeout_raw = _strip_wrapping_quotes(
+            os.getenv("GMAIL_IMAP_TIMEOUT_SECONDS", "20").strip()
+        )
+        try:
+            imap_timeout_seconds = float(imap_timeout_raw)
+        except ValueError as exc:
+            raise ValueError(
+                f"GMAIL_IMAP_TIMEOUT_SECONDS non valido: {imap_timeout_raw!r}"
+            ) from exc
 
         return cls(
             address=address,
@@ -68,6 +78,7 @@ class EmailConfig:
                 os.getenv("GMAIL_IMAP_HOST", "imap.gmail.com").strip()
             ),
             imap_port=imap_port,
+            imap_timeout_seconds=max(1.0, imap_timeout_seconds),
             mailbox=_strip_wrapping_quotes(os.getenv("GMAIL_MAILBOX", "INBOX").strip()),
         )
 

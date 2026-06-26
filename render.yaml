@@ -43,6 +43,8 @@ services:
         value: imap.gmail.com
       - key: GMAIL_IMAP_PORT
         value: "993"
+      - key: GMAIL_IMAP_TIMEOUT_SECONDS
+        value: "20"
       - key: AGENT_MAX_ITERATIONS
         value: "12"
       - key: AGENT_DATE_WINDOW_DAYS
@@ -59,3 +61,5 @@ services:
         value: "false"
       - key: MSC_EMAIL_FROM
         value: msc-booking.no-reply@msccrociere.it
+      - key: MSC_EMAIL_MAX_RESULTS
+        value: "20"

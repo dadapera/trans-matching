@@ -42,12 +42,23 @@ const LIVE_EVENTS = new Set([
 ]);
 
 export function LiveFeed({ events, results, filterTraceId, onFilterTrace }: Props) {
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const shouldAutoScrollRef = useRef(true);
   const [debugMode, setDebugMode] = useState(false);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (!shouldAutoScrollRef.current) return;
+    const list = listRef.current;
+    list?.scrollTo({ top: list.scrollHeight, behavior: "smooth" });
   }, [events.length, results.length]);
+
+  const updateAutoScroll = () => {
+    const list = listRef.current;
+    if (!list) return;
+
+    const distanceFromBottom = list.scrollHeight - list.scrollTop - list.clientHeight;
+    shouldAutoScrollRef.current = distanceFromBottom < 80;
+  };
 
   const systemEvents = events.filter((ev) => {
     const name = eventName(ev);
@@ -109,7 +120,7 @@ export function LiveFeed({ events, results, filterTraceId, onFilterTrace }: Prop
         </div>
       </div>
 
-      <div className="live-feed__list">
+      <div className="live-feed__list" ref={listRef} onScroll={updateAutoScroll}>
         {systemEvents.length > 0 && !filterTraceId && (
           <div className="run-events">
             {systemEvents.map((event, i) => (
@@ -129,7 +140,6 @@ export function LiveFeed({ events, results, filterTraceId, onFilterTrace }: Prop
             onFilterTrace={onFilterTrace}
           />
         ))}
-        <div ref={bottomRef} />
       </div>
     </div>
   );

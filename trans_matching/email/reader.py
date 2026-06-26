@@ -131,6 +131,7 @@ class GmailReader:
             self._config.imap_host,
             self._config.imap_port,
             ssl_context=ssl_context,
+            timeout=self._config.imap_timeout_seconds,
         )
         try:
             self._mail.login(self._config.address, self._config.app_password)
