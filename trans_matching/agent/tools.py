@@ -146,6 +146,7 @@ def search_msc(search_date: str = "") -> str:
             before=(window_end + timedelta(days=1)).date(),
             include_body=True,
             max_results=config.max_results,
+            max_body_bytes=config.max_body_bytes,
         )
         session.logger.log(
             "email_search",
@@ -173,6 +174,7 @@ def search_msc(search_date: str = "") -> str:
         "search_date": target_date,
         "date_window_days": _MSC_EMAIL_WINDOW_DAYS,
         "max_results_per_sender": config.max_results,
+        "max_body_bytes": config.max_body_bytes,
         "emails_scanned": len(collected),
         "emails": collected,
         "note": "Parser MSC incompleto: affinare MSC_EMAIL_FROM e campi email quando disponibili.",

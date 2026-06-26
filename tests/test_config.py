@@ -16,8 +16,10 @@ def test_email_config_reads_imap_timeout(monkeypatch) -> None:
 def test_msc_email_config_limits_results(monkeypatch) -> None:
     monkeypatch.setenv("MSC_EMAIL_FROM", "a@example.com, b@example.com")
     monkeypatch.setenv("MSC_EMAIL_MAX_RESULTS", "500")
+    monkeypatch.setenv("MSC_EMAIL_MAX_BODY_BYTES", "2048")
 
     config = get_msc_email_config()
 
     assert config.from_addresses == ("a@example.com", "b@example.com")
     assert config.max_results == 100
+    assert config.max_body_bytes == 4096

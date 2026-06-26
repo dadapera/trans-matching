@@ -41,6 +41,7 @@ class EmailSearchQuery:
     before: date | None = None
     include_body: bool = False
     max_results: int | None = None
+    max_body_bytes: int | None = None
 
     def to_imap_criteria(self) -> str:
         criteria: list[str] = []

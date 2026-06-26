@@ -63,3 +63,5 @@ services:
         value: msc-booking.no-reply@msccrociere.it
       - key: MSC_EMAIL_MAX_RESULTS
         value: "20"
+      - key: MSC_EMAIL_MAX_BODY_BYTES
+        value: "65536"

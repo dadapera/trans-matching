@@ -182,7 +182,12 @@ class GmailReader:
 
             results: list[EmailMessage] = []
             for uid in uids:
-                status, fetched = mail.uid("fetch", uid, "(RFC822)")
+                fetch_query = _fetch_query(query)
+                try:
+                    status, fetched = mail.uid("fetch", uid, fetch_query)
+                except (TimeoutError, OSError):
+                    self.disconnect()
+                    break
                 if status != "OK" or not fetched or not fetched[0]:
                     continue
                 raw = fetched[0][1]
@@ -215,6 +220,7 @@ class GmailReader:
         before: date,
         include_body: bool = True,
         max_results: int | None = None,
+        max_body_bytes: int | None = None,
     ) -> list[EmailMessage]:
         return self.search(
             EmailSearchQuery(
@@ -223,6 +229,7 @@ class GmailReader:
                 before=before,
                 include_body=include_body,
                 max_results=max_results,
+                max_body_bytes=max_body_bytes,
             )
         )
 
@@ -240,3 +247,11 @@ class GmailReader:
                 include_body=include_body,
             )
         )
+
+
+def _fetch_query(query: EmailSearchQuery) -> str:
+    if not query.include_body:
+        return "(BODY.PEEK[HEADER])"
+    if query.max_body_bytes is not None:
+        return f"(BODY.PEEK[]<0.{query.max_body_bytes}>)"
+    return "(RFC822)"

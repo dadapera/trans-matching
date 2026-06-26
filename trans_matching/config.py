@@ -49,6 +49,7 @@ class AgentLogConfig:
 class MscEmailConfig:
     from_addresses: tuple[str, ...]
     max_results: int
+    max_body_bytes: int
 
 
 def get_expedia_matcher_mode() -> ExpediaMatcherMode:
@@ -125,9 +126,14 @@ def get_msc_email_config() -> MscEmailConfig:
         max_results = int(os.getenv("MSC_EMAIL_MAX_RESULTS", "20"))
     except ValueError:
         max_results = 20
+    try:
+        max_body_bytes = int(os.getenv("MSC_EMAIL_MAX_BODY_BYTES", "65536"))
+    except ValueError:
+        max_body_bytes = 65536
     return MscEmailConfig(
         from_addresses=addresses,
         max_results=max(1, min(max_results, 100)),
+        max_body_bytes=max(4096, min(max_body_bytes, 1_048_576)),
     )
 
 
