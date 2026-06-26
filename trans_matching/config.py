@@ -48,8 +48,7 @@ class AgentLogConfig:
 @dataclass(frozen=True)
 class MscEmailConfig:
     from_addresses: tuple[str, ...]
-    search_days: int
-    keywords: tuple[str, ...]
+    max_emails: int
 
 
 def get_expedia_matcher_mode() -> ExpediaMatcherMode:
@@ -123,15 +122,12 @@ def get_msc_email_config() -> MscEmailConfig:
         part.strip() for part in raw_from.split(",") if part.strip()
     ) or ("msc-booking.no-reply@msccrociere.it",)
     try:
-        search_days = int(os.getenv("MSC_SEARCH_DAYS", "5"))
+        max_emails = int(os.getenv("MSC_MAX_EMAILS", "10"))
     except ValueError:
-        search_days = 5
-    raw_keywords = os.getenv("MSC_SEARCH_KEYWORDS", "MSC,crociera,booking").strip()
-    keywords = tuple(part.strip() for part in raw_keywords.split(",") if part.strip())
+        max_emails = 10
     return MscEmailConfig(
         from_addresses=addresses,
-        search_days=max(1, search_days),
-        keywords=keywords,
+        max_emails=max(1, max_emails),
     )
 
 

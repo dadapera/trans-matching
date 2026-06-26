@@ -59,7 +59,5 @@ services:
         value: "false"
       - key: MSC_EMAIL_FROM
         value: msc-booking.no-reply@msccrociere.it
-      - key: MSC_SEARCH_DAYS
-        value: "5"
-      - key: MSC_SEARCH_KEYWORDS
-        value: MSC,crociera,booking
+      - key: MSC_MAX_EMAILS
+        value: "10"

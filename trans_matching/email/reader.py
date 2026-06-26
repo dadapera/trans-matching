@@ -3,6 +3,7 @@ from __future__ import annotations
 import email
 import imaplib
 import ssl
+from datetime import date
 from email.header import decode_header
 from email.message import Message
 
@@ -174,8 +175,12 @@ class GmailReader:
             if status != "OK" or not data or not data[0]:
                 return []
 
+            uids = data[0].split()
+            if query.max_results is not None:
+                uids = [] if query.max_results <= 0 else uids[-query.max_results:]
+
             results: list[EmailMessage] = []
-            for uid in data[0].split():
+            for uid in uids:
                 status, fetched = mail.uid("fetch", uid, "(RFC822)")
                 if status != "OK" or not fetched or not fetched[0]:
                     continue
@@ -198,6 +203,25 @@ class GmailReader:
                 from_address=from_address,
                 text=text,
                 include_body=include_body,
+            )
+        )
+
+    def search_by_sender_date_range(
+        self,
+        *,
+        from_address: str,
+        since: date,
+        before: date,
+        include_body: bool = True,
+        max_results: int | None = None,
+    ) -> list[EmailMessage]:
+        return self.search(
+            EmailSearchQuery(
+                from_address=from_address,
+                since=since,
+                before=before,
+                include_body=include_body,
+                max_results=max_results,
             )
         )
 

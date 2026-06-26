@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 
 from trans_matching.email.links import build_gmail_message_link, build_gmail_search_link
 
@@ -36,7 +37,10 @@ class EmailSearchQuery:
     from_address: str | None = None
     subject: str | None = None
     text: str | None = None
+    since: date | None = None
+    before: date | None = None
     include_body: bool = False
+    max_results: int | None = None
 
     def to_imap_criteria(self) -> str:
         criteria: list[str] = []
@@ -46,6 +50,10 @@ class EmailSearchQuery:
             criteria.append(f'SUBJECT "{self.subject}"')
         if self.text:
             criteria.append(f'TEXT "{self.text}"')
+        if self.since:
+            criteria.append(f'SINCE "{self.since.strftime("%d-%b-%Y")}"')
+        if self.before:
+            criteria.append(f'BEFORE "{self.before.strftime("%d-%b-%Y")}"')
         if not criteria:
             raise ValueError("Almeno un criterio di ricerca è richiesto")
         return f"({' '.join(criteria)})" if len(criteria) > 1 else criteria[0]

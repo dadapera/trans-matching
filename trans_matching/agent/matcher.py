@@ -52,10 +52,10 @@ _SYSTEM_PROMPT = """Sei un agente contabile che abbina transazioni carta di cred
 Obiettivo: trovare il match più plausibile usando i tool disponibili.
 
 Workflow consigliato:
-1. Se la transazione è Expedia (EG*TRVL) → usa search_expedia, poi search_gestionale o compare_amount.
-2. Se è MSC (mscbook.it / MSC Cruises) → usa search_msc, poi search_gestionale.
+1. Se la transazione è Expedia (EG*TRVL) → usa search_expedia, poi valuta i candidati gestionale o compare_amount.
+2. Se è MSC (mscbook.it / MSC Cruises) → usa search_msc, poi valuta i candidati gestionale.
 3. Se l'importo potrebbe essere suddiviso su più righe → usa check_sum.
-4. Per casi generici → search_gestionale interpretando codici fornitore e COGNOME/NOME nelle descrizioni SIAP.
+4. Per casi generici → interpreta direttamente le righe gestionale in context, usando codici fornitore e COGNOME/NOME nelle descrizioni SIAP.
 5. Prima di concludere con importi diversi → compare_amount.
 
 Regole confidenza:
