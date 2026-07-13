@@ -1,4 +1,5 @@
 import type { RunListItem } from "../types";
+import { formatRunCost } from "../utils/formatCost";
 
 interface Props {
   runs: RunListItem[];
@@ -13,7 +14,9 @@ export function RunHistory({ runs, activeRunId, onSelect }: Props) {
     <section className="panel run-history">
       <h2>Run recenti</h2>
       <ul className="run-history__list">
-        {runs.map((run) => (
+        {runs.map((run) => {
+          const cost = formatRunCost(run.llm_cost_usd);
+          return (
           <li key={run.id}>
             <button
               type="button"
@@ -24,10 +27,12 @@ export function RunHistory({ runs, activeRunId, onSelect }: Props) {
               <span className={`status-badge status-badge--${run.status}`}>{run.status}</span>
               <span className="run-history__meta">
                 {run.matched_count}/{run.total_transactions} match
+                {cost ? ` · ${cost}` : ""}
               </span>
             </button>
           </li>
-        ))}
+          );
+        })}
       </ul>
     </section>
   );

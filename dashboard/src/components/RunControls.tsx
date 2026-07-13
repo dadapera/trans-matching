@@ -29,13 +29,17 @@ export function RunControls({
 }: Props) {
   const pct = expected > 0 ? Math.round((processed / expected) * 100) : 0;
   const pending = starting || running;
-  const startLabel = running ? "In esecuzione" : starting ? "Avvio…" : "Avvia";
+  const statusBadgeStatus = starting ? "running" : status;
+  const statusBadgeLabel = starting ? "Avvio…" : statusLabel(status);
 
   return (
     <section className="panel run-controls">
       <h2>Analisi</h2>
       <div className="status-row">
-        <span className={`status-badge status-badge--${status}`}>{statusLabel(status)}</span>
+        <span className={`status-badge status-badge--${statusBadgeStatus}`}>
+          {pending && <Loader2 size={12} className="status-badge__spinner" />}
+          {statusBadgeLabel}
+        </span>
         {runId !== null && <span className="run-id">Run #{runId}</span>}
       </div>
 
@@ -54,20 +58,21 @@ export function RunControls({
       )}
 
       <div className="btn-row">
-        <button
-          type="button"
-          className={`btn btn--primary${pending ? " btn--loading" : ""}`}
-          disabled={!ready || pending}
-          onClick={onStart}
-          aria-busy={pending}
-        >
-          {pending ? <Loader2 size={16} className="btn__spinner" /> : <Play size={16} />}
-          {startLabel}
-        </button>
+        {!pending && (
+          <button
+            type="button"
+            className="btn btn--primary"
+            disabled={!ready}
+            onClick={onStart}
+          >
+            <Play size={16} />
+            Avvia
+          </button>
+        )}
         <button
           type="button"
           className="btn btn--danger"
-          disabled={!running}
+          disabled={!pending}
           onClick={onStop}
         >
           <Square size={16} />
@@ -75,7 +80,7 @@ export function RunControls({
         </button>
       </div>
 
-      {!ready && !running && (
+      {!ready && !pending && (
         <p className="hint-text">Carica carta (CSV/PDF) e gestionale PDF per avviare.</p>
       )}
       {error && <p className="error-text">{error}</p>}

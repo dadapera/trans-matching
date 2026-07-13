@@ -103,6 +103,7 @@ async def list_runs() -> list[RunListItemDTO]:
             total_transactions=run.total_transactions,
             matched_count=run.matched_count,
             expected_transactions=run.expected_transactions,
+            llm_cost_usd=run.llm_cost_usd,
         )
         for run in runs
     ]

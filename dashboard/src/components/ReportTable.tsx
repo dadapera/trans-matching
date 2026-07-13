@@ -1,5 +1,9 @@
+import { Download } from "lucide-react";
+import { useState } from "react";
 import type { MatchResultDTO, ResultFilter } from "../types";
 import { filterResults } from "../types";
+import { formatAlternativeLabel } from "../utils/alternatives";
+import { exportReportXlsx } from "../utils/exportReport";
 import { ResultSummary } from "./ResultSummary";
 
 interface Props {
@@ -15,6 +19,9 @@ export function ReportTable({
   onResultFilterChange,
   onSelectTrace,
 }: Props) {
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+
   if (results.length === 0) {
     return (
       <p className="empty-state">
@@ -25,13 +32,38 @@ export function ReportTable({
 
   const visibleResults = filterResults(results, resultFilter);
 
+  const handleExport = async () => {
+    if (visibleResults.length === 0 || exporting) return;
+    setExporting(true);
+    setExportError(null);
+    try {
+      await exportReportXlsx(visibleResults, resultFilter);
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : "Esportazione fallita");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="report-table-wrap">
-      <ResultSummary
-        results={results}
-        filter={resultFilter}
-        onFilterChange={onResultFilterChange}
-      />
+      <div className="report-toolbar">
+        <ResultSummary
+          results={results}
+          filter={resultFilter}
+          onFilterChange={onResultFilterChange}
+        />
+        <button
+          type="button"
+          className="btn btn--ghost"
+          disabled={visibleResults.length === 0 || exporting}
+          onClick={() => void handleExport()}
+        >
+          <Download size={16} />
+          {exporting ? "Esportazione…" : "Esporta XLSX"}
+        </button>
+      </div>
+      {exportError && <p className="error-text">{exportError}</p>}
       {visibleResults.length === 0 ? (
         <p className="empty-state">Nessuna transazione corrisponde al filtro selezionato.</p>
       ) : (
@@ -86,9 +118,9 @@ export function ReportTable({
                       </div>
                     ))
                   : row.alternatives.length > 0
-                    ? row.alternatives.map((a) => (
-                        <div key={a.identificativi.join(",")} className="alt-line">
-                          Alt: {a.identificativi.join(", ")} ({a.confidence})
+                    ? row.alternatives.map((a, index) => (
+                        <div key={`${index}-${formatAlternativeLabel(a)}`} className="alt-line">
+                          Alt: {formatAlternativeLabel(a)} ({a.confidence})
                         </div>
                       ))
                     : "—"}

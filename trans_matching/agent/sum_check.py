@@ -62,7 +62,9 @@ def find_amount_combinations(
                 seen.add(keys)
                 results.append(
                     {
-                        "identificativi": [txn.identificativo for txn in combo],
+                        "identificativi": [
+                            GestionalePool.row_reference(txn) for txn in combo
+                        ],
                         "total": str(total),
                         "delta_eur": str(total - target_amount),
                         "delta_pct": round(delta_pct, 2),

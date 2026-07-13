@@ -14,6 +14,7 @@ from trans_matching.agent.router import classify_card_transaction
 from trans_matching.agent.tools import (
     AGENT_TOOLS,
     build_result_from_output,
+    clean_identificativi,
     preview_for_identificativi,
 )
 from trans_matching.config import get_agent_config, get_openai_config
@@ -146,12 +147,7 @@ def match_one(session: MatchSession) -> AgentMatchResult:
 
         output = _extract_structured_output(result)
         alternatives = [
-            MatchAlternative(
-                identificativi=item.identificativi,
-                confidence=item.confidence,
-                reason=item.reason,
-                gestionale_preview=preview_for_identificativi(session.pool, item.identificativi),
-            )
+            _build_alternative(session, item)
             for item in output.alternatives
         ]
         agent_result = build_result_from_output(
@@ -159,7 +155,7 @@ def match_one(session: MatchSession) -> AgentMatchResult:
             trace_id=session.trace_id,
             row_number=session.row_number,
             strategy=output.strategy or category,
-            identificativi=output.identificativi,
+            identificativi=clean_identificativi(output.identificativi),
             confidence=output.confidence,
             reason=output.reason,
             alternatives=alternatives,
@@ -223,6 +219,19 @@ Gestionale (tutte le righe; [available] o già abbinate):
 Finestra date suggerita: ±{session.date_window_days} giorni.
 Se una riga è [matched → txn #N], preferisci alternative [available] salvo evidenza forte.
 Restituisci identificativi (1 o più), confidence, reason, alternatives se ambiguo."""
+
+
+def _build_alternative(session: MatchSession, item: AlternativeOutput) -> MatchAlternative:
+    identificativi = clean_identificativi(item.identificativi)
+    preview = preview_for_identificativi(session.pool, identificativi)
+    if not preview and item.reason:
+        preview = item.reason
+    return MatchAlternative(
+        identificativi=identificativi,
+        confidence=item.confidence,
+        reason=item.reason,
+        gestionale_preview=preview,
+    )
 
 
 def _extract_structured_output(result: dict) -> AgentMatchOutput:

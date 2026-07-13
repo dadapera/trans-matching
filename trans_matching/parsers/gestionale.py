@@ -56,6 +56,7 @@ def _extract_gestionale_line(line: str) -> Transaction | None:
         amount=amount,
         source="gestionale",
         raw=line,
+        identificativo=_extract_gestionale_identificativo(line),
     )
 
 

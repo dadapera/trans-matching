@@ -42,6 +42,12 @@ class GestionalePool:
         return f"{txn.date}|{txn.amount}|{txn.description}"
 
     @staticmethod
+    def row_reference(txn: Transaction) -> str:
+        if txn.identificativo.strip():
+            return txn.identificativo
+        return GestionalePool._row_signature(txn)
+
+    @staticmethod
     def _normalize_identifier(value: str) -> str:
         compact_pipes = re.sub(r"\s*\|\s*", "|", value.strip())
         return " ".join(compact_pipes.upper().split())

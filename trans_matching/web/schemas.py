@@ -81,6 +81,7 @@ class RunListItemDTO(BaseModel):
     total_transactions: int
     matched_count: int
     expected_transactions: int | None
+    llm_cost_usd: float | None = None
 
 
 def _txn_to_dto(txn: Transaction) -> TransactionDTO:

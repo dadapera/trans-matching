@@ -348,7 +348,17 @@ def _is_expedia_incompatible_row(txn: Transaction) -> bool:
 
 
 def preview_for_identificativi(pool, identificativi: list[str]) -> str:
-    rows = pool.find_by_identificativi(identificativi)
+    cleaned = [value.strip() for value in identificativi if value.strip()]
+    if not cleaned:
+        return ""
+    rows = pool.find_by_identificativi(cleaned)
     if not rows:
-        return ", ".join(identificativi)
-    return "; ".join(f"{txn.identificativo} {txn.description[:40]}" for txn in rows)
+        return ", ".join(cleaned)
+    return "; ".join(
+        f"{txn.identificativo or txn.date}|€{txn.amount} {txn.description[:40]}"
+        for txn in rows
+    )
+
+
+def clean_identificativi(identificativi: list[str]) -> list[str]:
+    return [value.strip() for value in identificativi if value.strip()]

@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import type { AgentEvent, MatchResultDTO, ResultFilter } from "../types";
 import { matchesResultFilter } from "../types";
+import { formatAlternativeLabel } from "../utils/alternatives";
 
 interface Props {
   events: AgentEvent[];
@@ -255,9 +256,10 @@ function ResultStep({ result, debugMode }: { result: MatchResultDTO; debugMode: 
             {result.alternatives.length > 0 && (
               <>
                 <strong>Alternative</strong>
-                {result.alternatives.map((alt) => (
-                  <p key={`${alt.identificativi.join(",")}-${alt.reason}`}>
-                    {alt.identificativi.join(", ") || "-"} · {alt.confidence} · {alt.reason}
+                {result.alternatives.map((alt, index) => (
+                  <p key={`${index}-${formatAlternativeLabel(alt)}`}>
+                    {formatAlternativeLabel(alt)} · {alt.confidence}
+                    {alt.reason ? ` · ${alt.reason}` : ""}
                   </p>
                 ))}
               </>

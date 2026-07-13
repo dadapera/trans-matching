@@ -87,6 +87,37 @@ def test_check_sum_does_not_mix_unrelated_providers() -> None:
     assert combos == []
 
 
+def test_check_sum_uses_row_signature_when_identifier_missing() -> None:
+    rows = [
+        _txn(
+            identificativo="",
+            date="05/03/2026",
+            amount="250.59",
+            description="RYA RYANAIR ROSSI/MARIO",
+        ),
+        _txn(
+            identificativo="",
+            date="05/03/2026",
+            amount="250.59",
+            description="RYA RYANAIR BIANCHI/LUCA",
+        ),
+    ]
+    pool = GestionalePool(rows + [_txn(identificativo="OTHER 1", amount="1.00")])
+
+    combos = find_amount_combinations(
+        pool,
+        target_amount=Decimal("501.18"),
+        card_date="05/03/2026",
+        card_description="RYANAIR LTD AIRLINE DUBLIN",
+        date_window_days=7,
+        tolerance_pct=1,
+        max_group_size=2,
+    )
+
+    assert combos
+    assert all(ref.strip() for combo in combos for ref in combo["identificativi"])
+
+
 def test_expedia_gate_rejects_transport_rows() -> None:
     card = _txn(
         amount="78.61",

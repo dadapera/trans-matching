@@ -65,6 +65,7 @@ export interface RunListItem {
   total_transactions: number;
   matched_count: number;
   expected_transactions: number | null;
+  llm_cost_usd: number | null;
 }
 
 export interface AgentEvent {
