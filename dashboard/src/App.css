@@ -178,6 +178,21 @@ body {
   cursor: not-allowed;
 }
 
+.btn--loading:disabled {
+  opacity: 1;
+  cursor: wait;
+}
+
+.btn__spinner {
+  animation: btn-spin 0.8s linear infinite;
+}
+
+@keyframes btn-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .btn--primary {
   background: var(--accent);
   color: #fff;

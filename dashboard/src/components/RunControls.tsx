@@ -1,8 +1,9 @@
-import { Play, Square } from "lucide-react";
+import { Loader2, Play, Square } from "lucide-react";
 
 interface Props {
   ready: boolean;
   running: boolean;
+  starting: boolean;
   runId: number | null;
   processed: number;
   expected: number;
@@ -16,6 +17,7 @@ interface Props {
 export function RunControls({
   ready,
   running,
+  starting,
   runId,
   processed,
   expected,
@@ -26,6 +28,8 @@ export function RunControls({
   error,
 }: Props) {
   const pct = expected > 0 ? Math.round((processed / expected) * 100) : 0;
+  const pending = starting || running;
+  const startLabel = running ? "In esecuzione" : starting ? "Avvio…" : "Avvia";
 
   return (
     <section className="panel run-controls">
@@ -52,12 +56,13 @@ export function RunControls({
       <div className="btn-row">
         <button
           type="button"
-          className="btn btn--primary"
-          disabled={!ready || running}
+          className={`btn btn--primary${pending ? " btn--loading" : ""}`}
+          disabled={!ready || pending}
           onClick={onStart}
+          aria-busy={pending}
         >
-          <Play size={16} />
-          Avvia
+          {pending ? <Loader2 size={16} className="btn__spinner" /> : <Play size={16} />}
+          {startLabel}
         </button>
         <button
           type="button"

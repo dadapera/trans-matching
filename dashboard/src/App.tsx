@@ -34,6 +34,7 @@ export default function App() {
   const [expected, setExpected] = useState(0);
   const [matchedCount, setMatchedCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [starting, setStarting] = useState(false);
 
   const [tab, setTab] = useState<TabId>("live");
   const [events, setEvents] = useState<AgentEvent[]>([]);
@@ -160,6 +161,7 @@ export default function App() {
 
   const handleStart = async () => {
     setError(null);
+    setStarting(true);
     try {
       const { run_id } = await startRun({
         row_start: transactionRange[0],
@@ -175,6 +177,8 @@ export default function App() {
       setTab("live");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Avvio fallito");
+    } finally {
+      setStarting(false);
     }
   };
 
@@ -221,6 +225,7 @@ export default function App() {
           <RunControls
             ready={sessionReady}
             running={running}
+            starting={starting}
             runId={runId}
             processed={processed}
             expected={runId === null ? selectedTransactionCount : expected}

@@ -22,3 +22,6 @@ logs/
 
 # Dashboard frontend
 dashboard/node_modules/
+
+# Local sample/input documents
+docs/*
