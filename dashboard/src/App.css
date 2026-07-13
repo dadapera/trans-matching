@@ -815,6 +815,19 @@ body {
   border-radius: 6px;
   background: var(--bg-panel);
   border: 1px solid var(--border);
+  font-family: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.report-stat:hover {
+  background: rgba(91, 141, 239, 0.08);
+}
+
+.report-stat--active {
+  box-shadow: 0 0 0 1px var(--accent);
+  background: rgba(91, 141, 239, 0.12);
 }
 
 .report-stat--ok {

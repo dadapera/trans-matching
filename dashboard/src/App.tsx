@@ -18,6 +18,7 @@ import type {
   AgentEvent,
   MatchResultDTO,
   RunListItem,
+  ResultFilter,
   TabId,
   UploadResponse,
 } from "./types";
@@ -41,6 +42,7 @@ export default function App() {
   const [events, setEvents] = useState<AgentEvent[]>([]);
   const [results, setResults] = useState<MatchResultDTO[]>([]);
   const [filterTraceId, setFilterTraceId] = useState<string | null>(null);
+  const [resultFilter, setResultFilter] = useState<ResultFilter>("all");
   const [runList, setRunList] = useState<RunListItem[]>([]);
   const [transactionRange, setTransactionRange] = useState<[number, number]>([1, 1]);
 
@@ -120,6 +122,7 @@ export default function App() {
           setResults([]);
           setMatchedCount(0);
           setProcessed(0);
+          setResultFilter("all");
         } else if (data.type === "run_stopping") {
           setStatus("stopping");
         } else if (data.type === "run_finished") {
@@ -192,6 +195,7 @@ export default function App() {
       setResults([]);
       setProcessed(0);
       setMatchedCount(0);
+      setResultFilter("all");
       if (selectedTransactionCount) setExpected(selectedTransactionCount);
       setTab("live");
     } catch (err) {
@@ -280,12 +284,15 @@ export default function App() {
               <LiveFeed
                 events={events}
                 results={results}
+                resultFilter={resultFilter}
                 filterTraceId={filterTraceId}
                 onFilterTrace={setFilterTraceId}
               />
             ) : (
               <ReportTable
                 results={results}
+                resultFilter={resultFilter}
+                onResultFilterChange={setResultFilter}
                 onSelectTrace={(id) => {
                   setFilterTraceId(id);
                   setTab("live");

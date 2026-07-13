@@ -1,11 +1,20 @@
-import type { MatchResultDTO } from "../types";
+import type { MatchResultDTO, ResultFilter } from "../types";
+import { filterResults } from "../types";
+import { ResultSummary } from "./ResultSummary";
 
 interface Props {
   results: MatchResultDTO[];
+  resultFilter: ResultFilter;
+  onResultFilterChange: (filter: ResultFilter) => void;
   onSelectTrace: (traceId: string) => void;
 }
 
-export function ReportTable({ results, onSelectTrace }: Props) {
+export function ReportTable({
+  results,
+  resultFilter,
+  onResultFilterChange,
+  onSelectTrace,
+}: Props) {
   if (results.length === 0) {
     return (
       <p className="empty-state">
@@ -14,16 +23,18 @@ export function ReportTable({ results, onSelectTrace }: Props) {
     );
   }
 
-  const matched = results.filter((r) => r.matched).length;
-  const ambiguous = results.filter((r) => r.ambiguous).length;
+  const visibleResults = filterResults(results, resultFilter);
 
   return (
     <div className="report-table-wrap">
-      <div className="report-summary">
-        <span className="report-stat report-stat--ok">{matched} match</span>
-        <span className="report-stat report-stat--warn">{ambiguous} ambigui</span>
-        <span className="report-stat">{results.length} totali</span>
-      </div>
+      <ResultSummary
+        results={results}
+        filter={resultFilter}
+        onFilterChange={onResultFilterChange}
+      />
+      {visibleResults.length === 0 ? (
+        <p className="empty-state">Nessuna transazione corrisponde al filtro selezionato.</p>
+      ) : (
       <table className="report-table">
         <thead>
           <tr>
@@ -38,7 +49,7 @@ export function ReportTable({ results, onSelectTrace }: Props) {
           </tr>
         </thead>
         <tbody>
-          {results.map((row) => (
+          {visibleResults.map((row) => (
             <tr
               key={row.row_number}
               className={
@@ -87,6 +98,7 @@ export function ReportTable({ results, onSelectTrace }: Props) {
           ))}
         </tbody>
       </table>
+      )}
     </div>
   );
 }

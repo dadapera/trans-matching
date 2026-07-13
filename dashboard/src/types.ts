@@ -78,3 +78,25 @@ export interface AgentEvent {
 }
 
 export type TabId = "live" | "report";
+
+export type ResultFilter = "all" | "matched" | "ambiguous";
+
+export function filterResults(
+  results: MatchResultDTO[],
+  filter: ResultFilter,
+): MatchResultDTO[] {
+  if (filter === "matched") return results.filter((row) => row.matched);
+  if (filter === "ambiguous") return results.filter((row) => row.ambiguous);
+  return results;
+}
+
+export function matchesResultFilter(
+  result: MatchResultDTO | undefined,
+  filter: ResultFilter,
+): boolean {
+  if (filter === "all") return true;
+  if (!result) return false;
+  if (filter === "matched") return result.matched;
+  if (filter === "ambiguous") return result.ambiguous;
+  return true;
+}

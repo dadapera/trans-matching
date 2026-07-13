@@ -8,11 +8,13 @@ import {
   Mail,
   Wrench,
 } from "lucide-react";
-import type { AgentEvent, MatchResultDTO } from "../types";
+import type { AgentEvent, MatchResultDTO, ResultFilter } from "../types";
+import { matchesResultFilter } from "../types";
 
 interface Props {
   events: AgentEvent[];
   results: MatchResultDTO[];
+  resultFilter: ResultFilter;
   filterTraceId: string | null;
   onFilterTrace: (traceId: string | null) => void;
 }
@@ -41,7 +43,13 @@ const LIVE_EVENTS = new Set([
   "run_error",
 ]);
 
-export function LiveFeed({ events, results, filterTraceId, onFilterTrace }: Props) {
+export function LiveFeed({
+  events,
+  results,
+  resultFilter,
+  filterTraceId,
+  onFilterTrace,
+}: Props) {
   const listRef = useRef<HTMLDivElement>(null);
   const shouldAutoScrollRef = useRef(true);
   const [debugMode, setDebugMode] = useState(false);
@@ -86,8 +94,9 @@ export function LiveFeed({ events, results, filterTraceId, onFilterTrace }: Prop
 
     return Array.from(groups.values())
       .filter((group) => !filterTraceId || group.traceId === filterTraceId)
+      .filter((group) => matchesResultFilter(group.result, resultFilter))
       .sort((a, b) => traceSortKey(a) - traceSortKey(b));
-  }, [events, filterTraceId, results]);
+  }, [events, filterTraceId, resultFilter, results]);
 
   return (
     <div className="live-feed">
