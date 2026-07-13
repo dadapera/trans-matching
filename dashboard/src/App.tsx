@@ -13,6 +13,7 @@ import { ReportTable } from "./components/ReportTable";
 import { RunControls } from "./components/RunControls";
 import { RunHistory } from "./components/RunHistory";
 import { UploadPanel } from "./components/UploadPanel";
+import { ensureNotificationPermission, notifyRunFinished } from "./notifications";
 import type {
   AgentEvent,
   MatchResultDTO,
@@ -122,14 +123,31 @@ export default function App() {
         } else if (data.type === "run_stopping") {
           setStatus("stopping");
         } else if (data.type === "run_finished") {
-          setStatus(data.status as string);
+          const finalStatus = data.status as string;
+          setStatus(finalStatus);
           setProcessed(data.processed as number);
           setExpected(data.expected as number);
           setMatchedCount(data.matched as number);
+          notifyRunFinished({
+            runId,
+            status: finalStatus,
+            matched: data.matched as number,
+            processed: data.processed as number,
+            expected: data.expected as number,
+          });
           fetchRunList().then(setRunList).catch(() => undefined);
         } else if (data.type === "run_error") {
+          const message = data.error as string;
           setStatus("error");
-          setError(data.error as string);
+          setError(message);
+          notifyRunFinished({
+            runId,
+            status: "error",
+            matched: matchedCount,
+            processed,
+            expected,
+            error: message,
+          });
         } else {
           setEvents((prev) => [...prev, data as AgentEvent]);
         }
@@ -146,7 +164,7 @@ export default function App() {
     );
 
     return unsubscribe;
-  }, [expected, runId]);
+  }, [expected, matchedCount, processed, runId]);
 
   const handleUploaded = (info: UploadResponse) => {
     setSessionReady(true);
@@ -162,6 +180,7 @@ export default function App() {
   const handleStart = async () => {
     setError(null);
     setStarting(true);
+    void ensureNotificationPermission();
     try {
       const { run_id } = await startRun({
         row_start: transactionRange[0],
