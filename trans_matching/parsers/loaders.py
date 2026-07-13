@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from trans_matching.parsers.amex import parse_amex_csv
+from trans_matching.parsers.amex import parse_amex_file
 from trans_matching.parsers.gestionale import ensure_gestionale_csv_files, parse_gestionale_csv
 
 
@@ -10,8 +10,9 @@ def load_card_transactions(carta_dir: Path) -> list:
     from trans_matching.models import Transaction
 
     transactions: list[Transaction] = []
-    for csv_file in sorted(carta_dir.glob("*.csv")):
-        transactions.extend(parse_amex_csv(csv_file))
+    sources = sorted(carta_dir.glob("*.csv")) + sorted(carta_dir.glob("*.pdf"))
+    for source_file in sources:
+        transactions.extend(parse_amex_file(source_file))
     return transactions
 
 

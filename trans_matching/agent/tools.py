@@ -12,6 +12,7 @@ from trans_matching.agent.dates import date_window_bounds
 from trans_matching.agent.sum_check import find_amount_combinations
 from trans_matching.config import get_agent_log_config, get_msc_email_config
 from trans_matching.matchers.agent_models import AgentMatchResult, Confidence, MatchAlternative
+from trans_matching.matchers.gestionale_text import normalize_text
 from trans_matching.models import Transaction
 from trans_matching.verifiers.expedia_parser import format_llm_email_text, parse_expedia_email
 from trans_matching.verifiers.expedia_trvl import EXPEDIA_SENDER, extract_booking_code, pick_best_email
@@ -67,6 +68,7 @@ def check_sum(
         session.pool,
         target_amount=target,
         card_date=session.card.date,
+        card_description=session.card.description,
         date_window_days=window,
         tolerance_pct=tolerance_pct,
     )
@@ -212,29 +214,39 @@ def _amount_note(delta_pct: float) -> str:
 
 def apply_confidence_gate(
     *,
+    card: Transaction,
     confidence: Confidence,
     identificativi: list[str],
     alternatives: list[MatchAlternative],
     pool,
     card_row_number: int,
-) -> tuple[bool, list[Transaction], Confidence]:
+) -> tuple[bool, list[Transaction], Confidence, str | None]:
     """Match confermato solo con confidence alto/medio, identificativi risolvibili e senza conflitti."""
     strong_alternatives = [
         alt for alt in alternatives if alt.confidence in ("alto", "medio")
     ]
     if len(strong_alternatives) >= 2:
-        return False, [], "basso"
+        return False, [], "basso", "alternative forti multiple"
 
     if confidence not in ("alto", "medio") or not identificativi:
-        return False, [], confidence if confidence == "basso" else "basso"
+        return False, [], confidence if confidence == "basso" else "basso", None
 
     if pool.has_assignment_conflict(identificativi, card_row_number):
-        return False, [], "basso"
+        return False, [], "basso", "riga già assegnata ad altra transazione"
 
     resolved = pool.find_by_identificativi(identificativi)
     if not resolved:
-        return False, [], "basso"
-    return True, resolved, confidence
+        return False, [], "basso", "identificativi non risolti o ambigui"
+
+    amount_reason = _amount_gate_reason(card, resolved)
+    if amount_reason is not None:
+        return False, [], "basso", amount_reason
+
+    merchant_reason = _merchant_gate_reason(card, resolved)
+    if merchant_reason is not None:
+        return False, [], "basso", merchant_reason
+
+    return True, resolved, confidence, None
 
 
 def build_result_from_output(
@@ -249,7 +261,8 @@ def build_result_from_output(
     alternatives: list[MatchAlternative],
     pool,
 ) -> AgentMatchResult:
-    matched, gestionale, final_confidence = apply_confidence_gate(
+    matched, gestionale, final_confidence, gate_block = apply_confidence_gate(
+        card=card,
         confidence=confidence,
         identificativi=identificativi,
         alternatives=alternatives,
@@ -257,8 +270,8 @@ def build_result_from_output(
         card_row_number=row_number,
     )
     gate_reason = reason
-    if not matched and pool.has_assignment_conflict(identificativi, row_number):
-        gate_reason = f"{reason} [Gate: riga già assegnata ad altra transazione]"
+    if not matched and gate_block:
+        gate_reason = f"{reason} [Gate: {gate_block}]"
     elif not matched and confidence in ("alto", "medio"):
         gate_reason = f"{reason} [Gate: match non confermato]"
     elif not matched and confidence == "basso":
@@ -274,6 +287,63 @@ def build_result_from_output(
         strategy=strategy,
         trace_id=trace_id,
         row_number=row_number,
+    )
+
+
+def _amount_gate_reason(card: Transaction, gestionale: list[Transaction]) -> str | None:
+    total = sum((txn.amount for txn in gestionale), Decimal("0"))
+    if card.amount == 0:
+        return None if total == 0 else "importo gestionale diverso da zero"
+
+    if (card.amount > 0 and total <= 0) or (card.amount < 0 and total >= 0):
+        return f"segno importo incoerente: carta {card.amount}, gestionale {total}"
+
+    delta_pct = abs(float((total - card.amount) / card.amount * 100))
+    if delta_pct > 15:
+        return f"scostamento importo {delta_pct:.2f}% oltre soglia 15%"
+
+    return None
+
+
+_EXPEDIA_INCOMPATIBLE_TOKENS = {
+    "TRE",
+    "TRENITALIA",
+    "RYA",
+    "RYANAIR",
+    "WIZ",
+    "WIZZ",
+    "FB",
+    "FLIXBUS",
+    "PC",
+    "PEGASUS",
+    "WY",
+    "OMAN",
+    "EST",
+    "ESTA",
+}
+
+
+def _merchant_gate_reason(card: Transaction, gestionale: list[Transaction]) -> str | None:
+    card_text = normalize_text(card.description)
+    if "EG*TRVL" not in card_text and "EG TRVL" not in card_text:
+        return None
+
+    incompatible_rows = [
+        txn.identificativo or txn.description
+        for txn in gestionale
+        if _is_expedia_incompatible_row(txn)
+    ]
+    if incompatible_rows:
+        return "fornitore gestionale incoerente con Expedia: " + ", ".join(incompatible_rows)
+    return None
+
+
+def _is_expedia_incompatible_row(txn: Transaction) -> bool:
+    tokens = normalize_text(txn.description).split()
+    if not tokens:
+        return False
+    return tokens[0] in _EXPEDIA_INCOMPATIBLE_TOKENS or any(
+        token in _EXPEDIA_INCOMPATIBLE_TOKENS for token in tokens[:3]
     )
 
 

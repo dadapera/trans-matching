@@ -10,10 +10,13 @@ dependencies = [
     "langchain-core>=0.3",
     "langchain-openai>=0.2",
     "openai>=1.0",
+    "pillow>=12.3.0",
     "pydantic>=2.0",
+    "pymupdf>=1.28.0",
     "pypdf>=5.0",
     "python-dotenv>=1.0",
     "python-multipart>=0.0.9",
+    "rapidocr-onnxruntime>=1.4.4",
     "tqdm>=4.0",
     "uvicorn[standard]>=0.32",
 ]

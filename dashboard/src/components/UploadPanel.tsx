@@ -115,8 +115,8 @@ export function UploadPanel({
     <section className="panel upload-panel">
       <h2>Documenti</h2>
       <DropZone
-        label="Transazioni carta (CSV)"
-        accept=".csv"
+        label="Transazioni carta (CSV o PDF)"
+        accept=".csv,.pdf"
         filename={cartaFilename ?? cartaFile?.name}
         count={cartaCount}
         onFile={setCartaFile}

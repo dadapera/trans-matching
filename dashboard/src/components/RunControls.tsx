@@ -71,7 +71,7 @@ export function RunControls({
       </div>
 
       {!ready && !running && (
-        <p className="hint-text">Carica carta CSV e gestionale PDF per avviare.</p>
+        <p className="hint-text">Carica carta (CSV/PDF) e gestionale PDF per avviare.</p>
       )}
       {error && <p className="error-text">{error}</p>}
     </section>

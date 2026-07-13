@@ -5,7 +5,11 @@ from decimal import Decimal
 
 from trans_matching.agent.dates import dates_within_window
 from trans_matching.agent.pool import GestionalePool
-from trans_matching.matchers.gestionale_text import normalize_guest_parts, split_gestionale_description
+from trans_matching.matchers.gestionale_text import (
+    normalize_guest_parts,
+    normalize_text,
+    split_gestionale_description,
+)
 from trans_matching.models import Transaction
 
 
@@ -14,6 +18,7 @@ def find_amount_combinations(
     *,
     target_amount: Decimal,
     card_date: str,
+    card_description: str = "",
     date_window_days: int = 7,
     tolerance_pct: float = 15.0,
     max_group_size: int = 5,
@@ -25,6 +30,7 @@ def find_amount_combinations(
         for txn in pool.available()
         if dates_within_window(card_date, txn.date, days=date_window_days)
         and txn.amount > 0
+        and _is_candidate_compatible(card_description, txn)
     ]
     if not candidates:
         return []
@@ -33,17 +39,15 @@ def find_amount_combinations(
     for txn in candidates:
         guest_key = _guest_key(txn)
         ident_key = _ident_prefix(txn.identificativo)
-        for key in {guest_key, ident_key, "ALL"}:
+        provider_key = _provider_key(txn.description)
+        for key in {guest_key, ident_key, provider_key}:
             grouped.setdefault(key, []).append(txn)
 
     seen: set[tuple[str, ...]] = set()
     results: list[dict] = []
 
     for group_key, group in grouped.items():
-        if group_key == "ALL":
-            subset = candidates[:40]
-        else:
-            subset = group[:20]
+        subset = group[:20]
         for size in range(2, min(max_group_size, len(subset)) + 1):
             for combo in itertools.combinations(subset, size):
                 keys = tuple(sorted(txn.identificativo or txn.description for txn in combo))
@@ -87,3 +91,42 @@ def _ident_prefix(identificativo: str) -> str:
     if len(tokens) >= 2:
         return "IDENT:" + " ".join(tokens[:2])
     return "IDENT:" + identificativo
+
+
+def _provider_key(description: str) -> str:
+    tokens = normalize_text(description).split()
+    if not tokens:
+        return "PROVIDER:UNKNOWN"
+    return "PROVIDER:" + tokens[0]
+
+
+_EXPEDIA_INCOMPATIBLE_TOKENS = {
+    "TRE",
+    "TRENITALIA",
+    "RYA",
+    "RYANAIR",
+    "WIZ",
+    "WIZZ",
+    "FB",
+    "FLIXBUS",
+    "PC",
+    "PEGASUS",
+    "WY",
+    "OMAN",
+    "EST",
+    "ESTA",
+}
+
+
+def _is_candidate_compatible(card_description: str, txn: Transaction) -> bool:
+    card_text = normalize_text(card_description)
+    if "EG TRVL" not in card_text and "EG*TRVL" not in card_text:
+        return True
+
+    tokens = normalize_text(txn.description).split()
+    if not tokens:
+        return True
+    return not (
+        tokens[0] in _EXPEDIA_INCOMPATIBLE_TOKENS
+        or any(token in _EXPEDIA_INCOMPATIBLE_TOKENS for token in tokens[:3])
+    )

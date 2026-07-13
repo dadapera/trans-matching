@@ -6,7 +6,7 @@ from pathlib import Path
 from fastapi import HTTPException, UploadFile
 
 from trans_matching.models import Transaction
-from trans_matching.parsers.amex import parse_amex_csv
+from trans_matching.parsers.amex import parse_amex_file
 from trans_matching.parsers.gestionale import parse_gestionale_pdf
 
 
@@ -17,9 +17,11 @@ async def parse_upload_files(
     carta_name = carta.filename or "carta.csv"
     gestionale_name = gestionale.filename or "gestionale.pdf"
 
-    if not carta_name.lower().endswith(".csv"):
-        raise HTTPException(status_code=400, detail="Il file carta deve essere CSV")
-    if not gestionale_name.lower().endswith(".pdf"):
+    carta_suffix = Path(carta_name).suffix.lower()
+    gestionale_suffix = Path(gestionale_name).suffix.lower()
+    if carta_suffix not in {".csv", ".pdf"}:
+        raise HTTPException(status_code=400, detail="Il file carta deve essere CSV o PDF")
+    if gestionale_suffix != ".pdf":
         raise HTTPException(status_code=400, detail="Il file gestionale deve essere PDF")
 
     carta_bytes = await carta.read()
@@ -31,17 +33,17 @@ async def parse_upload_files(
 
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp = Path(tmp_dir)
-        carta_path = tmp / "carta.csv"
+        carta_path = tmp / f"carta{carta_suffix}"
         gestionale_path = tmp / "gestionale.pdf"
         carta_path.write_bytes(carta_bytes)
         gestionale_path.write_bytes(gestionale_bytes)
 
         try:
-            card_txns = parse_amex_csv(carta_path)
+            card_txns = parse_amex_file(carta_path)
         except Exception as exc:
             raise HTTPException(
                 status_code=400,
-                detail=f"Errore parsing CSV carta: {exc}",
+                detail=f"Errore parsing file carta: {exc}",
             ) from exc
 
         try:
@@ -53,7 +55,7 @@ async def parse_upload_files(
             ) from exc
 
     if not card_txns:
-        raise HTTPException(status_code=400, detail="Nessuna transazione nel CSV carta")
+        raise HTTPException(status_code=400, detail="Nessuna transazione nel file carta")
     if not gestionale_txns:
         raise HTTPException(status_code=400, detail="Nessuna transazione nel PDF gestionale")
 

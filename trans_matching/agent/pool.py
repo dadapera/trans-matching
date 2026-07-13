@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from collections import Counter
 from dataclasses import dataclass
 from decimal import Decimal
 
@@ -25,10 +26,16 @@ class GestionalePool:
     def __init__(self, transactions: list[Transaction]) -> None:
         self._all = list(transactions)
         self._assignments: dict[str, RowAssignment] = {}
+        self._identifier_counts = Counter(
+            self._normalize_identifier(txn.identificativo)
+            for txn in self._all
+            if txn.identificativo
+        )
 
-    @staticmethod
-    def _key(txn: Transaction) -> str:
-        return txn.identificativo or GestionalePool._row_signature(txn)
+    def _key(self, txn: Transaction) -> str:
+        return self._normalize_identifier(
+            f"{txn.identificativo}|{self._row_signature(txn)}|{txn.raw}"
+        )
 
     @staticmethod
     def _row_signature(txn: Transaction) -> str:
@@ -39,15 +46,16 @@ class GestionalePool:
         compact_pipes = re.sub(r"\s*\|\s*", "|", value.strip())
         return " ".join(compact_pipes.upper().split())
 
-    @staticmethod
-    def _identifier_aliases(txn: Transaction) -> set[str]:
+    def _identifier_aliases(self, txn: Transaction) -> set[str]:
         aliases = {
             GestionalePool._row_signature(txn),
             f"{txn.identificativo}|{txn.date}|{txn.amount}|{txn.description}",
             f"{txn.date}|{txn.description}|{txn.amount}",
         }
         if txn.identificativo:
-            aliases.add(txn.identificativo)
+            normalized_identifier = self._normalize_identifier(txn.identificativo)
+            if self._identifier_counts[normalized_identifier] == 1:
+                aliases.add(txn.identificativo)
         else:
             aliases.add(f"|{GestionalePool._row_signature(txn)}")
         return {
