@@ -75,13 +75,54 @@ def parse_gestionale_pdf(path: Path) -> list[Transaction]:
                     amount=txn.amount,
                     source=str(path),
                     raw=txn.raw,
+                    identificativo=txn.identificativo,
                 )
             )
     return transactions
 
 
+def _parse_siap_documento_codice(raw: str) -> tuple[str, str]:
+    tokens = raw.split()
+    if not tokens:
+        return "", ""
+
+    documento = tokens[0]
+    tail = tokens[1:]
+    if not tail:
+        return documento, ""
+
+    if documento == "PRT":
+        numeri: list[str] = []
+        for token in tail:
+            if re.fullmatch(r"\d+", token):
+                numeri.append(token)
+                if len(numeri) == 2:
+                    break
+            elif numeri:
+                break
+        if len(numeri) >= 2:
+            return documento, f"{numeri[0]} {numeri[1]}"
+        return documento, numeri[0] if numeri else ""
+
+    first = tail[0]
+    if re.fullmatch(r"\d{8,}", first) or re.fullmatch(r"\d+", first):
+        return documento, first
+
+    return documento, first
+
+
 def _extract_gestionale_identificativo(raw: str) -> str:
+    documento, codice_cliente = _parse_siap_documento_codice(raw)
+    if documento and codice_cliente:
+        return f"{documento} {codice_cliente}"
     return " ".join(raw.split()[:3])
+
+
+def format_siap_match_label(identificativo: str) -> str:
+    cleaned = identificativo.strip()
+    if not cleaned or "|" in cleaned:
+        return cleaned or "—"
+    return f"[{cleaned}]"
 
 
 def convert_gestionale_pdf_to_csv(pdf_path: Path) -> Path:

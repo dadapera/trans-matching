@@ -11,6 +11,7 @@ import {
 import type { AgentEvent, MatchResultDTO, ResultFilter } from "../types";
 import { matchesResultFilter } from "../types";
 import { formatAlternativeLabel } from "../utils/alternatives";
+import { formatGestionaleMatchLabel, formatGestionaleMatchLine } from "../utils/gestionaleMatch";
 
 interface Props {
   events: AgentEvent[];
@@ -247,7 +248,8 @@ function ResultStep({ result, debugMode }: { result: MatchResultDTO; debugMode: 
             {result.gestionale.length > 0 ? (
               result.gestionale.map((item) => (
                 <p key={item.identificativo || item.description}>
-                  {item.identificativo || "-"} · {item.description} · €{item.amount}
+                  <strong>{formatGestionaleMatchLabel(item.identificativo)}</strong>{" "}
+                  {item.description} · €{item.amount}
                 </p>
               ))
             ) : (

@@ -1,6 +1,7 @@
 import ExcelJS from "exceljs";
 import type { MatchResultDTO, ResultFilter } from "../types";
-import { formatAlternativeLabel } from "./alternatives";
+import { formatAlternativeLabel } from "../utils/alternatives";
+import { formatGestionaleMatchLabel, formatGestionaleMatchLine } from "../utils/gestionaleMatch";
 
 const FILTER_SUFFIX: Record<ResultFilter, string> = {
   all: "tutti",
@@ -35,10 +36,7 @@ function rowFill(row: MatchResultDTO): string {
 function formatGestionaleCell(row: MatchResultDTO): string {
   if (row.gestionale.length > 0) {
     return row.gestionale
-      .map((item) => {
-        const id = item.identificativo?.trim() || "—";
-        return `${id} · ${item.description} (€${item.amount})`;
-      })
+      .map((item) => formatGestionaleMatchLine(item.identificativo, item.description, item.amount))
       .join("\n");
   }
   if (row.alternatives.length > 0) {

@@ -3,6 +3,7 @@ import { useState } from "react";
 import type { MatchResultDTO, ResultFilter } from "../types";
 import { filterResults } from "../types";
 import { formatAlternativeLabel } from "../utils/alternatives";
+import { formatGestionaleMatchLabel } from "../utils/gestionaleMatch";
 import { exportReportXlsx } from "../utils/exportReport";
 import { ResultSummary } from "./ResultSummary";
 
@@ -114,7 +115,8 @@ export function ReportTable({
                 {row.gestionale.length > 0
                   ? row.gestionale.map((g) => (
                       <div key={g.identificativo || g.description}>
-                        <strong>{g.identificativo || "—"}</strong> {g.description} (€{g.amount})
+                        <strong>{formatGestionaleMatchLabel(g.identificativo)}</strong>{" "}
+                        {g.description} (€{g.amount})
                       </div>
                     ))
                   : row.alternatives.length > 0

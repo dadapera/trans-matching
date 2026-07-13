@@ -13,6 +13,7 @@ from trans_matching.agent.sum_check import find_amount_combinations
 from trans_matching.config import get_agent_log_config, get_msc_email_config
 from trans_matching.matchers.agent_models import AgentMatchResult, Confidence, MatchAlternative
 from trans_matching.matchers.gestionale_text import normalize_text
+from trans_matching.parsers.gestionale import format_siap_match_label
 from trans_matching.models import Transaction
 from trans_matching.verifiers.expedia_parser import format_llm_email_text, parse_expedia_email
 from trans_matching.verifiers.expedia_trvl import EXPEDIA_SENDER, extract_booking_code, pick_best_email
@@ -355,7 +356,9 @@ def preview_for_identificativi(pool, identificativi: list[str]) -> str:
     if not rows:
         return ", ".join(cleaned)
     return "; ".join(
-        f"{txn.identificativo or txn.date}|€{txn.amount} {txn.description[:40]}"
+        f"{format_siap_match_label(txn.identificativo)} · €{txn.amount} {txn.description[:40]}"
+        if txn.identificativo
+        else f"{txn.date}|€{txn.amount} {txn.description[:40]}"
         for txn in rows
     )
 

@@ -118,6 +118,24 @@ def test_check_sum_uses_row_signature_when_identifier_missing() -> None:
     assert all(ref.strip() for combo in combos for ref in combo["identificativi"])
 
 
+def test_siap_identificativo_uses_documento_and_codice_cliente() -> None:
+    from trans_matching.parsers.gestionale import (
+        _extract_gestionale_identificativo,
+        format_siap_match_label,
+    )
+
+    assert _extract_gestionale_identificativo(
+        "BAW            2424 20 1 1   4361   2/07/26            712,90  RYA RYANAIR"
+    ) == "BAW 2424"
+    assert _extract_gestionale_identificativo(
+        "PRT   26        171 20 1 1   4273  29/06/26            190,00  AUTO EUROPE"
+    ) == "PRT 26 171"
+    assert _extract_gestionale_identificativo(
+        "BF       2602090001 20 1 2    113  10/02/26             76,00  TRE TRENITALIA"
+    ) == "BF 2602090001"
+    assert format_siap_match_label("LOW 8574") == "[LOW 8574]"
+
+
 def test_expedia_gate_rejects_transport_rows() -> None:
     card = _txn(
         amount="78.61",
