@@ -11,7 +11,7 @@ import {
 import type { AgentEvent, MatchResultDTO, ResultFilter } from "../types";
 import { matchesResultFilter } from "../types";
 import { formatAlternativeLabel } from "../utils/alternatives";
-import { formatGestionaleMatchLabel, formatGestionaleMatchLine } from "../utils/gestionaleMatch";
+import { formatGestionaleMatchLabel } from "../utils/gestionaleMatch";
 
 interface Props {
   events: AgentEvent[];

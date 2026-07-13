@@ -1,7 +1,7 @@
 import ExcelJS from "exceljs";
 import type { MatchResultDTO, ResultFilter } from "../types";
 import { formatAlternativeLabel } from "../utils/alternatives";
-import { formatGestionaleMatchLabel, formatGestionaleMatchLine } from "../utils/gestionaleMatch";
+import { formatGestionaleMatchLine } from "../utils/gestionaleMatch";
 
 const FILTER_SUFFIX: Record<ResultFilter, string> = {
   all: "tutti",
