@@ -81,6 +81,7 @@ class RunListItemDTO(BaseModel):
     total_transactions: int
     matched_count: int
     expected_transactions: int | None
+    elapsed_seconds: float | None = None
     llm_cost_usd: float | None = None
 
 
