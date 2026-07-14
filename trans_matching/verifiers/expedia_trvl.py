@@ -22,6 +22,13 @@ class ExpediaTransaction:
     booking_code: str
 
 
+@dataclass(frozen=True)
+class ExpediaEmailSearchResult:
+    emails: list[EmailMessage]
+    strategy: str | None
+    attempts: list[dict[str, object]]
+
+
 @dataclass
 class ExpediaVerificationResult:
     expedia: ExpediaTransaction
@@ -55,6 +62,55 @@ def pick_best_email(emails: list[EmailMessage], booking_code: str) -> EmailMessa
         if booking_code in mail.text_content:
             return mail
     return emails[0]
+
+
+def search_expedia_emails(
+    reader: GmailReader,
+    booking_code: str,
+    *,
+    from_address: str = EXPEDIA_SENDER,
+    include_body: bool = True,
+) -> ExpediaEmailSearchResult:
+    """Cerca email Expedia con fallback progressivi su mittente e formato codice."""
+    code = booking_code.strip()
+    prefixed_code = code if code.upper().startswith("EG*TRVL") else f"EG*TRVL{code}"
+    strategies = [
+        ("sender_code", code, from_address),
+        ("sender_prefixed_code", prefixed_code, from_address),
+        ("any_sender_code", code, None),
+        ("any_sender_prefixed_code", prefixed_code, None),
+    ]
+
+    attempts: list[dict[str, object]] = []
+    seen: set[tuple[str, str | None]] = set()
+    for strategy, query, sender in strategies:
+        if not query:
+            continue
+        key = (query, sender)
+        if key in seen:
+            continue
+        seen.add(key)
+        emails = reader.search_by_text(
+            query,
+            from_address=sender,
+            include_body=include_body,
+        )
+        attempts.append(
+            {
+                "strategy": strategy,
+                "query": query,
+                "from_address": sender,
+                "results": len(emails),
+            }
+        )
+        if emails:
+            return ExpediaEmailSearchResult(
+                emails=emails,
+                strategy=strategy,
+                attempts=attempts,
+            )
+
+    return ExpediaEmailSearchResult(emails=[], strategy=None, attempts=attempts)
 
 
 def verify_booking_confirmation(

@@ -8,7 +8,12 @@ import sys
 
 from trans_matching.email import GmailReader
 from trans_matching.verifiers.expedia_parser import format_llm_email_text
-from trans_matching.verifiers.expedia_trvl import EXPEDIA_SENDER, extract_booking_code, pick_best_email
+from trans_matching.verifiers.expedia_trvl import (
+    EXPEDIA_SENDER,
+    extract_booking_code,
+    pick_best_email,
+    search_expedia_emails,
+)
 
 _EXPEDIA_TRVL_ARG = re.compile(r"EG\*TRVL(\d+)", re.IGNORECASE)
 
@@ -38,13 +43,13 @@ def fetch_clean_email(
     code = _normalize_booking_id(booking_id)
 
     with GmailReader() as reader:
-        emails = reader.search_by_text(
+        search_result = search_expedia_emails(
+            reader,
             code,
             from_address=EXPEDIA_SENDER,
             include_body=True,
         )
-        if not emails:
-            emails = reader.search_by_text(code, include_body=True)
+        emails = search_result.emails
 
         if not emails:
             raise LookupError(f"Nessuna email trovata per il codice {code}")
@@ -64,6 +69,8 @@ def fetch_clean_email(
                 f"Date: {mail.date}\n"
                 f"UID: {mail.uid}\n"
                 f"Emails trovate: {len(emails)}\n"
+                f"Strategia ricerca: {search_result.strategy}\n"
+                f"Tentativi ricerca: {search_result.attempts}\n"
                 f"---\n"
             )
             return meta + text

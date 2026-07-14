@@ -1,10 +1,11 @@
 from decimal import Decimal
 
 from trans_matching.agent.pool import GestionalePool
-from trans_matching.agent.sum_check import find_amount_combinations
+from trans_matching.agent.sum_check import find_amount_combinations, find_document_amount_groups
 from trans_matching.agent.tools import apply_confidence_gate
 from trans_matching.models import Transaction
 from trans_matching.parsers.amex import parse_amex_csv
+from trans_matching.verifiers.expedia_trvl import search_expedia_emails
 
 
 def _txn(
@@ -118,6 +119,45 @@ def test_check_sum_uses_row_signature_when_identifier_missing() -> None:
     assert all(ref.strip() for combo in combos for ref in combo["identificativi"])
 
 
+def test_document_group_sum_matches_same_siap_document() -> None:
+    pool = GestionalePool(
+        [
+            _txn(
+                identificativo="PRT 26 147",
+                date="05/03/2026",
+                amount="584.00",
+                description="EXPEDIA INC. ROSSI/MARIO",
+            ),
+            _txn(
+                identificativo="PRT 26 147",
+                date="05/03/2026",
+                amount="245.00",
+                description="EXPEDIA INC. ROSSI/MARIO",
+            ),
+            _txn(
+                identificativo="PRT 26 148",
+                date="05/03/2026",
+                amount="829.00",
+                description="EXPEDIA INC. BIANCHI/LUCA",
+            ),
+        ]
+    )
+
+    groups = find_document_amount_groups(
+        pool,
+        target_amount=Decimal("829.00"),
+        card_date="05/03/2026",
+        card_description="EG*TRVL123",
+        date_window_days=7,
+        tolerance_pct=1,
+    )
+
+    assert groups
+    assert groups[0]["identificativo"] == "PRT 26 147"
+    assert groups[0]["total"] == "829.00"
+    assert all("|05/03/2026|" in ref for ref in groups[0]["identificativi"])
+
+
 def test_siap_identificativo_uses_documento_and_codice_cliente() -> None:
     from trans_matching.parsers.gestionale import (
         _extract_gestionale_identificativo,
@@ -161,3 +201,27 @@ def test_expedia_gate_rejects_transport_rows() -> None:
     assert resolved == []
     assert confidence == "basso"
     assert reason is not None and "incoerente con Expedia" in reason
+
+
+def test_expedia_email_search_falls_back_without_sender() -> None:
+    class Reader:
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, str | None]] = []
+
+        def search_by_text(self, text, *, from_address=None, include_body=True):
+            self.calls.append((text, from_address))
+            if text == "733123" and from_address is None:
+                return ["mail"]
+            return []
+
+    reader = Reader()
+
+    result = search_expedia_emails(reader, "733123")
+
+    assert result.emails == ["mail"]
+    assert result.strategy == "any_sender_code"
+    assert reader.calls == [
+        ("733123", "noreply@expediataap.it"),
+        ("EG*TRVL733123", "noreply@expediataap.it"),
+        ("733123", None),
+    ]

@@ -44,7 +44,7 @@ class GestionalePool:
     @staticmethod
     def row_reference(txn: Transaction) -> str:
         if txn.identificativo.strip():
-            return txn.identificativo
+            return f"{txn.identificativo}|{GestionalePool._row_signature(txn)}"
         return GestionalePool._row_signature(txn)
 
     @staticmethod

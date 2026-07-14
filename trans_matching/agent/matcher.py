@@ -15,6 +15,8 @@ from trans_matching.agent.tools import (
     AGENT_TOOLS,
     build_result_from_output,
     clean_identificativi,
+    collect_document_group_context,
+    collect_expedia_context,
     preview_for_identificativi,
 )
 from trans_matching.config import get_agent_config, get_openai_config
@@ -55,9 +57,10 @@ Obiettivo: trovare il match più plausibile usando i tool disponibili.
 Workflow consigliato:
 1. Se la transazione è Expedia (EG*TRVL) → usa search_expedia, poi valuta i candidati gestionale o compare_amount.
 2. Se è MSC (mscbook.it / MSC Cruises) → usa search_msc, poi valuta i candidati gestionale.
-3. Se l'importo potrebbe essere suddiviso su più righe → usa check_sum.
-4. Per casi generici → interpreta direttamente le righe gestionale in context, usando codici fornitore e COGNOME/NOME nelle descrizioni SIAP.
-5. Prima di concludere con importi diversi → compare_amount.
+3. Se l'importo potrebbe essere suddiviso su più righe dello stesso Documento+Codice Cliente → usa check_document_group_sum.
+4. Se resta una somma multi-riga non coperta dal documento → usa check_sum.
+5. Per casi generici → interpreta direttamente le righe gestionale in context, usando codici fornitore e COGNOME/NOME nelle descrizioni SIAP.
+6. Prima di concludere con importi diversi → compare_amount.
 
 Regole confidenza:
 - "alto": match univoco e coerente (ospite/fornitore/data/importo).
@@ -110,7 +113,6 @@ def match_one(session: MatchSession) -> AgentMatchResult:
         agent_config = get_agent_config()
         agent = get_matching_agent()
 
-        user_prompt = _format_user_prompt(session, category)
         session.logger.log(
             "txn_start",
             trace_id=session.trace_id,
@@ -119,6 +121,16 @@ def match_one(session: MatchSession) -> AgentMatchResult:
             card_amount=str(session.card.amount),
             card_description=session.card.description,
             category=category,
+        )
+        expedia_context = (
+            collect_expedia_context(session) if category == "expedia" else None
+        )
+        document_group_context = collect_document_group_context(session)
+        user_prompt = _format_user_prompt(
+            session,
+            category,
+            expedia_context,
+            document_group_context,
         )
 
         callback = AgentTraceCallback()
@@ -204,7 +216,29 @@ def match_one(session: MatchSession) -> AgentMatchResult:
         reset_session(token)
 
 
-def _format_user_prompt(session: MatchSession, category: str) -> str:
+def _format_user_prompt(
+    session: MatchSession,
+    category: str,
+    expedia_context: dict | None = None,
+    document_group_context: dict | None = None,
+) -> str:
+    expedia_section = ""
+    if expedia_context is not None:
+        expedia_section = f"""
+Contesto Expedia già raccolto tramite search_expedia:
+{expedia_context}
+
+Usa questo contesto per decidere il match Expedia; richiama search_expedia solo se il contesto è insufficiente o contraddittorio.
+"""
+    document_group_section = ""
+    if document_group_context and document_group_context.get("count", 0) > 0:
+        document_group_section = f"""
+Candidati aggregati SIAP per stesso Documento+Codice Cliente:
+{document_group_context}
+
+Se un gruppo ha somma coerente, stesso fornitore/contesto e non ci sono alternative equivalenti, puoi restituire tutti i suoi identificativi.
+"""
+
     return f"""Abbina questa transazione carta a righe del gestionale.
 
 Transazione carta:
@@ -212,6 +246,8 @@ Transazione carta:
 - importo: {session.card.amount}
 - descrizione: {session.card.description}
 - categoria suggerita: {category}
+{expedia_section}
+{document_group_section}
 
 Gestionale (tutte le righe; [available] o già abbinate):
 {session.pool.format_rows()}

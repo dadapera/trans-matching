@@ -9,6 +9,7 @@ from trans_matching.verifiers.expedia_trvl import (
     ExpediaTransaction,
     ExpediaVerificationResult,
     pick_best_email,
+    search_expedia_emails,
 )
 
 
@@ -20,18 +21,21 @@ def verify_with_regex(
     from_address: str = EXPEDIA_SENDER,
 ) -> ExpediaVerificationResult:
     """Cerca email Expedia, estrae hotel/ospite con regex e abbina al gestionale."""
-    emails = reader.search_by_text(
+    search_result = search_expedia_emails(
+        reader,
         expedia.booking_code,
         from_address=from_address,
         include_body=True,
     )
+    emails = search_result.emails
 
     if not emails:
         return ExpediaVerificationResult(
             expedia=expedia,
             email_found=False,
             emails=[],
-            note="Nessuna email trovata con questo codice",
+            note="Nessuna email trovata con questo codice"
+            f" (tentativi: {search_result.attempts})",
         )
 
     matched_email = pick_best_email(emails, expedia.booking_code)

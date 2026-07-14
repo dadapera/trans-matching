@@ -80,6 +80,63 @@ def find_amount_combinations(
     return results[:limit]
 
 
+def find_document_amount_groups(
+    pool: GestionalePool,
+    *,
+    target_amount: Decimal,
+    card_date: str,
+    card_description: str = "",
+    date_window_days: int = 7,
+    tolerance_pct: float = 15.0,
+    limit: int = 10,
+) -> list[dict]:
+    """Trova gruppi per Documento+Codice Cliente la cui somma approssima la carta."""
+    if target_amount <= 0:
+        return []
+
+    grouped: dict[str, list[Transaction]] = {}
+    for txn in pool.available():
+        if not txn.identificativo.strip():
+            continue
+        if not dates_within_window(card_date, txn.date, days=date_window_days):
+            continue
+        if txn.amount <= 0:
+            continue
+        if not _is_candidate_compatible(card_description, txn):
+            continue
+        grouped.setdefault(txn.identificativo, []).append(txn)
+
+    results: list[dict] = []
+    for group_key, rows in grouped.items():
+        if len(rows) < 2:
+            continue
+        total = sum((txn.amount for txn in rows), Decimal("0"))
+        if total <= 0:
+            continue
+        delta_pct = abs(float((total - target_amount) / target_amount * 100))
+        if delta_pct > tolerance_pct:
+            continue
+        results.append(
+            {
+                "identificativo": group_key,
+                "identificativi": [
+                    GestionalePool.row_reference(txn) for txn in rows
+                ],
+                "total": str(total),
+                "delta_eur": str(total - target_amount),
+                "delta_pct": round(delta_pct, 2),
+                "row_count": len(rows),
+                "rows": [
+                    f"{txn.identificativo}|{txn.date}|{txn.amount}|{txn.description}"
+                    for txn in rows
+                ],
+            }
+        )
+
+    results.sort(key=lambda item: (item["delta_pct"], item["row_count"]))
+    return results[:limit]
+
+
 def _guest_key(txn: Transaction) -> str:
     _, guest = split_gestionale_description(txn.description)
     if not guest:

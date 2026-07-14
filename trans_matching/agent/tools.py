@@ -9,14 +9,19 @@ from langchain_core.tools import tool
 
 from trans_matching.agent.context import get_session
 from trans_matching.agent.dates import date_window_bounds
-from trans_matching.agent.sum_check import find_amount_combinations
+from trans_matching.agent.sum_check import find_amount_combinations, find_document_amount_groups
 from trans_matching.config import get_agent_log_config, get_msc_email_config
 from trans_matching.matchers.agent_models import AgentMatchResult, Confidence, MatchAlternative
 from trans_matching.matchers.gestionale_text import normalize_text
 from trans_matching.parsers.gestionale import format_siap_match_label
 from trans_matching.models import Transaction
 from trans_matching.verifiers.expedia_parser import format_llm_email_text, parse_expedia_email
-from trans_matching.verifiers.expedia_trvl import EXPEDIA_SENDER, extract_booking_code, pick_best_email
+from trans_matching.verifiers.expedia_trvl import (
+    EXPEDIA_SENDER,
+    extract_booking_code,
+    pick_best_email,
+    search_expedia_emails,
+)
 from trans_matching.verifiers.msc_parser import parse_msc_email
 
 _MSC_EMAIL_WINDOW_DAYS = 7
@@ -79,28 +84,84 @@ def check_sum(
 
 
 @tool
+def check_document_group_sum(
+    card_amount: float | None = None,
+    date_window_days: int | None = None,
+    tolerance_pct: float = 15.0,
+) -> str:
+    """Somma righe SIAP con stesso Documento+Codice Cliente e confronta con la carta."""
+    session = get_session()
+    payload = collect_document_group_context(
+        session,
+        card_amount=card_amount,
+        date_window_days=date_window_days,
+        tolerance_pct=tolerance_pct,
+    )
+    return json.dumps(payload, ensure_ascii=False)
+
+
+def collect_document_group_context(
+    session,
+    *,
+    card_amount: float | None = None,
+    date_window_days: int | None = None,
+    tolerance_pct: float = 15.0,
+) -> dict:
+    started = time.perf_counter()
+    target = Decimal(str(card_amount if card_amount is not None else session.card.amount))
+    window = date_window_days or session.date_window_days
+    groups = find_document_amount_groups(
+        session.pool,
+        target_amount=target,
+        card_date=session.card.date,
+        card_description=session.card.description,
+        date_window_days=window,
+        tolerance_pct=tolerance_pct,
+    )
+    payload = {"count": len(groups), "groups": groups}
+    _log_tool(session, "check_document_group_sum", {"count": len(groups)}, started)
+    return payload
+
+
+@tool
 def search_expedia(booking_code: str = "") -> str:
     """Cerca email Expedia per codice prenotazione EG*TRVL e estrae hotel/ospite."""
     session = get_session()
+    payload = collect_expedia_context(session, booking_code=booking_code)
+    return json.dumps(payload, ensure_ascii=False)
+
+
+def collect_expedia_context(session, booking_code: str = "") -> dict:
+    """Raccoglie il contesto Expedia in modo deterministico per tool e prefetch."""
     started = time.perf_counter()
     code = booking_code.strip() or extract_booking_code(session.card.description) or ""
     if not code:
         payload = {"error": "Codice prenotazione Expedia non trovato"}
         _log_tool(session, "search_expedia", payload, started)
-        return json.dumps(payload, ensure_ascii=False)
+        return payload
 
-    emails = session.reader.search_by_text(code, from_address=EXPEDIA_SENDER, include_body=True)
-    session.logger.log(
-        "email_search",
-        trace_id=session.trace_id,
-        provider="expedia",
-        query=code,
-        results=len(emails),
+    search_result = search_expedia_emails(
+        session.reader,
+        code,
+        from_address=EXPEDIA_SENDER,
+        include_body=True,
     )
+    for attempt in search_result.attempts:
+        session.logger.log(
+            "email_search",
+            trace_id=session.trace_id,
+            provider="expedia",
+            **attempt,
+        )
+    emails = search_result.emails
     if not emails:
-        payload = {"booking_code": code, "email_found": False}
+        payload = {
+            "booking_code": code,
+            "email_found": False,
+            "search_attempts": search_result.attempts,
+        }
         _log_tool(session, "search_expedia", payload, started)
-        return json.dumps(payload, ensure_ascii=False)
+        return payload
 
     matched_email = pick_best_email(emails, code)
     hotel, guest = parse_expedia_email(matched_email.body, matched_email.html_body)
@@ -116,6 +177,8 @@ def search_expedia(booking_code: str = "") -> str:
     payload = {
         "booking_code": code,
         "email_found": True,
+        "search_strategy": search_result.strategy,
+        "search_attempts": search_result.attempts,
         "hotel": hotel,
         "guest": guest,
         "email_text": email_text if log_config.log_email_body else email_text[:300],
@@ -124,7 +187,7 @@ def search_expedia(booking_code: str = "") -> str:
         ],
     }
     _log_tool(session, "search_expedia", {"booking_code": code, "candidates": len(gestionale_hits)}, started)
-    return json.dumps(payload, ensure_ascii=False)
+    return payload
 
 
 @tool
@@ -188,6 +251,7 @@ def search_msc(search_date: str = "") -> str:
 
 AGENT_TOOLS = [
     compare_amount,
+    check_document_group_sum,
     check_sum,
     search_expedia,
     search_msc,

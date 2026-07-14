@@ -21,6 +21,7 @@ from trans_matching.verifiers.expedia_trvl import (
     ExpediaVerificationResult,
     LlmConfidence,
     pick_best_email,
+    search_expedia_emails,
 )
 
 
@@ -193,11 +194,13 @@ def _prepare_expedia(
     *,
     from_address: str,
 ) -> _PreparedExpedia | None:
-    emails = reader.search_by_text(
+    search_result = search_expedia_emails(
+        reader,
         expedia.booking_code,
         from_address=from_address,
         include_body=True,
     )
+    emails = search_result.emails
     if not emails:
         return None
 
