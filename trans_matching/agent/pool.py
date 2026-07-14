@@ -13,6 +13,8 @@ from trans_matching.matchers.gestionale_text import (
 )
 from trans_matching.models import Transaction
 
+_DATE_IN_TEXT = re.compile(r"\b\d{1,2}/\d{1,2}/\d{2,4}\b")
+
 
 @dataclass(frozen=True)
 class RowAssignment:
@@ -208,7 +210,11 @@ class GestionalePool:
                 continue
             if hotel and not hotel_matches(txn.description, hotel):
                 continue
-            if card_date and not dates_within_window(card_date, txn.date, days=date_window_days):
+            if card_date and not _dates_within_any_siap_date(
+                card_date,
+                txn,
+                days=date_window_days,
+            ):
                 continue
 
             score = 2
@@ -229,3 +235,11 @@ class GestionalePool:
     def format_rows(self, transactions: list[Transaction] | None = None) -> str:
         rows = transactions if transactions is not None else self._all
         return "\n".join(self.format_row(txn) for txn in rows)
+
+
+def _dates_within_any_siap_date(card_date: str, txn: Transaction, *, days: int) -> bool:
+    """SIAP rows can contain accounting date plus service/payment dates in raw text."""
+    dates = [txn.date]
+    if txn.raw:
+        dates.extend(_DATE_IN_TEXT.findall(txn.raw))
+    return any(dates_within_window(card_date, date, days=days) for date in dates)

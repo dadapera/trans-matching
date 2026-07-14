@@ -248,6 +248,37 @@ def test_expedia_guest_hotel_search_uses_extended_window() -> None:
     assert [txn.identificativo for txn in extended] == ["998 26 135", "998 26 115"]
 
 
+def test_expedia_guest_hotel_search_uses_secondary_siap_date_from_raw() -> None:
+    row = _txn(
+        identificativo="998 26 156",
+        date="08/04/2026",
+        amount="180.00",
+        description="094 IBIS STYLES BRI AZZI/STEFANO",
+    )
+    row = Transaction(
+        date=row.date,
+        description=row.description,
+        amount=row.amount,
+        source=row.source,
+        raw=(
+            "998 26 156 20 1 2 94 8/04/26 EUR 180,00 "
+            "094 IBIS STYLES BRI AZZI/STEFANO 0,00 6/03/26"
+        ),
+        identificativo=row.identificativo,
+    )
+    pool = GestionalePool([row])
+
+    matches = pool.search_by_guest_hotel(
+        guest="STEFANO AZZI",
+        hotel="ibis Styles Brindisi",
+        amount=Decimal("180.00"),
+        card_date="06/03/2026",
+        date_window_days=30,
+    )
+
+    assert [txn.identificativo for txn in matches] == ["998 26 156"]
+
+
 def test_expedia_email_search_falls_back_without_sender() -> None:
     class Reader:
         def __init__(self) -> None:
