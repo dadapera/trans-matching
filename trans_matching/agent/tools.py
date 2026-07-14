@@ -214,6 +214,12 @@ def collect_expedia_context(session, booking_code: str = "") -> dict:
 def search_msc(search_date: str = "") -> str:
     """Cerca tutte le email MSC per mittente nel range ±7 giorni dalla data indicata."""
     session = get_session()
+    payload = collect_msc_context(session, search_date=search_date)
+    return json.dumps(payload, ensure_ascii=False)
+
+
+def collect_msc_context(session, search_date: str = "") -> dict:
+    """Raccoglie cognomi passeggeri dagli allegati booking MSC."""
     started = time.perf_counter()
     config = get_msc_email_config()
     target_date = search_date.strip() or session.card.date
@@ -221,8 +227,8 @@ def search_msc(search_date: str = "") -> str:
 
     if window_start is None or window_end is None:
         payload = {"error": f"Data ricerca MSC non valida: {target_date!r}"}
-        _log_tool(session, "search_msc", payload, started)
-        return json.dumps(payload, ensure_ascii=False)
+        _log_tool(session, "msc_context", payload, started)
+        return payload
 
     collected: list[dict] = []
     for from_address in config.from_addresses:
@@ -233,6 +239,7 @@ def search_msc(search_date: str = "") -> str:
             include_body=True,
             max_results=config.max_results,
             max_body_bytes=config.max_body_bytes,
+            include_attachments=True,
         )
         session.logger.log(
             "email_search",
@@ -245,35 +252,57 @@ def search_msc(search_date: str = "") -> str:
             results=len(emails),
         )
         for mail in emails:
-            parsed = parse_msc_email(mail.body, mail.html_body)
+            parsed = parse_msc_email(
+                mail.body,
+                mail.html_body,
+                subject=mail.subject,
+                attachments=mail.attachments,
+            )
             collected.append(
                 {
                     "from": from_address,
                     "subject": mail.subject,
                     "date": mail.date,
+                    "uid": mail.uid,
                     "parsed": parsed,
                 }
             )
 
+    surnames = sorted(
+        {
+            surname
+            for item in collected
+            for surname in item["parsed"].get("passenger_surnames", [])
+            if isinstance(surname, str) and surname
+        }
+    )
     payload = {
-        "parser_status": "stub",
+        "status": "passengers_found" if surnames else "no_passengers",
         "search_date": target_date,
         "date_window_days": _MSC_EMAIL_WINDOW_DAYS,
         "max_results_per_sender": config.max_results,
         "max_body_bytes": config.max_body_bytes,
         "emails_scanned": len(collected),
+        "passenger_surnames": surnames,
         "emails": collected,
-        "note": "Parser MSC incompleto: affinare MSC_EMAIL_FROM e campi email quando disponibili.",
     }
-    _log_tool(session, "search_msc", {"emails": len(collected)}, started)
-    return json.dumps(payload, ensure_ascii=False)
+    _log_tool(
+        session,
+        "msc_context",
+        {
+            "status": payload["status"],
+            "emails": len(collected),
+            "passenger_surnames": surnames,
+        },
+        started,
+    )
+    return payload
 
 
 AGENT_TOOLS = [
     compare_amount,
     check_document_group_sum,
     check_sum,
-    search_msc,
 ]
 
 

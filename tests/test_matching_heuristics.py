@@ -6,6 +6,7 @@ from trans_matching.agent.tools import AGENT_TOOLS, apply_confidence_gate
 from trans_matching.matchers.gestionale_text import hotel_matches
 from trans_matching.models import Transaction
 from trans_matching.parsers.amex import parse_amex_csv
+from trans_matching.verifiers.msc_parser import parse_msc_subject
 from trans_matching.verifiers.expedia_trvl import search_expedia_emails
 
 
@@ -307,4 +308,15 @@ def test_expedia_context_is_not_exposed_as_agent_tool() -> None:
     tool_names = {tool.name for tool in AGENT_TOOLS}
 
     assert "search_expedia" not in tool_names
-    assert {"compare_amount", "check_document_group_sum", "check_sum", "search_msc"} <= tool_names
+    assert "search_msc" not in tool_names
+    assert {"compare_amount", "check_document_group_sum", "check_sum"} <= tool_names
+
+
+def test_msc_subject_extracts_booking_code() -> None:
+    parsed = parse_msc_subject("Numero di prenotazione per AIA150 70527640")
+
+    assert parsed == {
+        "booking_prefix": "AIA150",
+        "booking_number": "70527640",
+        "booking_code": "AIA150 70527640",
+    }

@@ -8,7 +8,7 @@ from email.header import decode_header
 from email.message import Message
 
 from trans_matching.email.config import EmailConfig, get_email_config, get_imap_ssl_context
-from trans_matching.email.models import EmailMessage, EmailSearchQuery
+from trans_matching.email.models import EmailAttachment, EmailMessage, EmailSearchQuery
 
 _GMAIL_AUTH_HINT = (
     "Verifica su Render/Dashboard: GMAIL_ADDRESS = email completa dell'account Google; "
@@ -95,7 +95,33 @@ def _extract_body(msg: Message) -> tuple[str, str]:
     return str(payload or ""), ""
 
 
-def _parse_message(uid: bytes, raw: bytes, *, include_body: bool) -> EmailMessage:
+def _extract_attachments(msg: Message) -> tuple[EmailAttachment, ...]:
+    attachments: list[EmailAttachment] = []
+    for part in msg.walk():
+        filename = _decode_header_value(part.get_filename())
+        disposition = (part.get_content_disposition() or "").lower()
+        if not filename and disposition != "attachment":
+            continue
+        payload = part.get_payload(decode=True)
+        if not isinstance(payload, bytes) or not payload:
+            continue
+        attachments.append(
+            EmailAttachment(
+                filename=filename,
+                content_type=part.get_content_type(),
+                data=payload,
+            )
+        )
+    return tuple(attachments)
+
+
+def _parse_message(
+    uid: bytes,
+    raw: bytes,
+    *,
+    include_body: bool,
+    include_attachments: bool,
+) -> EmailMessage:
     msg: Message = email.message_from_bytes(raw)
     body, html_body = _extract_body(msg) if include_body else ("", "")
     return EmailMessage(
@@ -106,6 +132,7 @@ def _parse_message(uid: bytes, raw: bytes, *, include_body: bool) -> EmailMessag
         body=body,
         html_body=html_body,
         message_id=_decode_header_value(msg.get("Message-ID")),
+        attachments=_extract_attachments(msg) if include_attachments else (),
     )
 
 
@@ -192,7 +219,14 @@ class GmailReader:
                     continue
                 raw = fetched[0][1]
                 if isinstance(raw, bytes):
-                    results.append(_parse_message(uid, raw, include_body=query.include_body))
+                    results.append(
+                        _parse_message(
+                            uid,
+                            raw,
+                            include_body=query.include_body,
+                            include_attachments=query.include_attachments,
+                        )
+                    )
             return results
 
         return self._run_imap(_search)
@@ -221,6 +255,7 @@ class GmailReader:
         include_body: bool = True,
         max_results: int | None = None,
         max_body_bytes: int | None = None,
+        include_attachments: bool = False,
     ) -> list[EmailMessage]:
         return self.search(
             EmailSearchQuery(
@@ -228,6 +263,7 @@ class GmailReader:
                 since=since,
                 before=before,
                 include_body=include_body,
+                include_attachments=include_attachments,
                 max_results=max_results,
                 max_body_bytes=max_body_bytes,
             )
@@ -250,6 +286,8 @@ class GmailReader:
 
 
 def _fetch_query(query: EmailSearchQuery) -> str:
+    if query.include_attachments:
+        return "(RFC822)"
     if not query.include_body:
         return "(BODY.PEEK[HEADER])"
     if query.max_body_bytes is not None:

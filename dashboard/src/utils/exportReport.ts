@@ -20,7 +20,7 @@ const COLORS = {
   unmatched: "FFF8F9FB",
 } as const;
 
-const WRAP_COLUMNS = new Set([3, 7, 8]);
+const WRAP_COLUMNS = new Set([3, 7, 8, 9]);
 
 function outcomeLabel(row: MatchResultDTO, reuseMap: Map<string, number[]>): string {
   if (hasGestionaleReuse(row, reuseMap)) return "Match ambiguo";
@@ -99,6 +99,7 @@ export async function exportReportXlsx(
     { header: "Confidenza", key: "confidence", width: 12 },
     { header: "Gestionale", key: "gestionale", width: 40 },
     { header: "Motivazione", key: "reason", width: 46 },
+    { header: "MSC passeggeri", key: "mscPassengers", width: 26 },
     { header: "Strategia", key: "strategy", width: 12 },
     { header: "Trace ID", key: "traceId", width: 22 },
   ];
@@ -113,6 +114,7 @@ export async function exportReportXlsx(
       confidence: row.confidence,
       gestionale: formatGestionaleCell(row, reuseMap),
       reason: row.reason,
+      mscPassengers: formatMscPassengers(row),
       strategy: row.strategy,
       traceId: row.trace_id,
     });
@@ -182,4 +184,14 @@ export async function exportReportXlsx(
 
   const buffer = await workbook.xlsx.writeBuffer();
   downloadBuffer(buffer, buildFilename(filter));
+}
+
+function formatMscPassengers(row: MatchResultDTO): string {
+  const metadata = row.metadata;
+  if (!metadata || typeof metadata !== "object") return "";
+  const msc = metadata.msc;
+  if (!msc || typeof msc !== "object" || Array.isArray(msc)) return "";
+  const surnames = (msc as { passenger_surnames?: unknown }).passenger_surnames;
+  if (!Array.isArray(surnames)) return "";
+  return surnames.filter((item): item is string => typeof item === "string" && item.length > 0).join(", ");
 }

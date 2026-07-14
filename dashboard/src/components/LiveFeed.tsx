@@ -269,6 +269,7 @@ function ResultStep({
             <strong>Strategia</strong>
             <p>{result.strategy || "-"}</p>
             <strong>Gestionale</strong>
+            {formatMscPassengers(result) && <p>MSC passeggeri: {formatMscPassengers(result)}</p>}
             {result.gestionale.length > 0 ? (
               result.gestionale.map((item) => (
                 <p key={item.identificativo || item.description}>
@@ -277,7 +278,7 @@ function ResultStep({
                 </p>
               ))
             ) : (
-              <p>-</p>
+              <p>{formatMscPassengers(result) ? "" : "-"}</p>
             )}
             {result.alternatives.length > 0 && (
               <>
@@ -332,6 +333,7 @@ function buildSteps(trace: TraceGroup): TraceStepData[] {
 function eventIcon(name: string, event: AgentEvent) {
   if (name === "error" || name === "run_error") return <AlertCircle size={16} />;
   if (isExpediaContextTool(event)) return <Mail size={16} />;
+  if (isMscContextTool(event)) return <Mail size={16} />;
   if (name === "tool_call") return <Wrench size={16} />;
   if (name === "email_search") return <Mail size={16} />;
   if (name === "agent_step") return <Bot size={16} />;
@@ -369,6 +371,7 @@ function formatEvent(name: string, event: AgentEvent): string {
       const tool = event.tool as string | undefined;
       const phase = event.phase as string | undefined;
       if (tool === "expedia_context") return `Contesto Expedia: ${compactExpediaContextSummary(event.output_summary)}`;
+      if (tool === "msc_context") return `Contesto MSC: ${compactMscContextSummary(event.output_summary)}`;
       if (phase === "start") return `→ ${tool}`;
       return `← ${tool ?? "tool"}: ${formatSummary(event.output_summary).slice(0, 120)}`;
     }
@@ -404,6 +407,7 @@ function stepTitle(name: string, event: AgentEvent): string {
       return `Classifico la transazione: ${event.category ?? "categoria non definita"}`;
     case "tool_call":
       if (isExpediaContextTool(event)) return "Raccolgo contesto Expedia";
+      if (isMscContextTool(event)) return "Estraggo cognomi MSC";
       return `Uso tool ${String(event.tool ?? "tool")}`;
     case "email_search":
       return `Cerco email ${String(event.provider ?? "")}`.trim();
@@ -435,6 +439,7 @@ function stepSummary(name: string, event: AgentEvent): string {
     case "tool_call": {
       const phase = event.phase as string | undefined;
       if (isExpediaContextTool(event)) return compactExpediaContextSummary(event.output_summary);
+      if (isMscContextTool(event)) return compactMscContextSummary(event.output_summary);
       if (phase === "start") return "Il tool è stato invocato; i dettagli sono disponibili cliccando.";
       return compactToolSummary(event.output_summary);
     }
@@ -467,6 +472,14 @@ function stepDetails(event: AgentEvent, debugMode: boolean): string | null {
         booking_code: outputSummaryValue(event, "booking_code"),
         candidate_strategy: outputSummaryValue(event, "candidate_strategy"),
         candidates: outputSummaryValue(event, "candidates"),
+        duration_ms: event.duration_ms,
+      });
+    }
+    if (isMscContextTool(event)) {
+      return formatJson({
+        status: outputSummaryValue(event, "status"),
+        emails: outputSummaryValue(event, "emails"),
+        passenger_surnames: outputSummaryValue(event, "passenger_surnames"),
         duration_ms: event.duration_ms,
       });
     }
@@ -526,6 +539,25 @@ function isExpediaContextTool(event: AgentEvent): boolean {
   return eventName(event) === "tool_call" && event.tool === "expedia_context";
 }
 
+function compactMscContextSummary(value: unknown): string {
+  const status = String(summaryValue(value, "status") ?? "");
+  const emails = summaryValue(value, "emails");
+  const surnames = summaryValue(value, "passenger_surnames");
+  const surnameText = Array.isArray(surnames) ? surnames.join(", ") : "";
+
+  if (status === "passengers_found") {
+    return `Cognomi passeggeri estratti${surnameText ? `: ${surnameText}` : ""}.`;
+  }
+  if (status === "no_passengers") {
+    return `Nessun cognome passeggero estratto${emails !== undefined ? ` da ${emails} email` : ""}.`;
+  }
+  return compactToolSummary(value);
+}
+
+function isMscContextTool(event: AgentEvent): boolean {
+  return eventName(event) === "tool_call" && event.tool === "msc_context";
+}
+
 function outputSummaryValue(event: AgentEvent, key: string): unknown {
   return summaryValue(event.output_summary, key);
 }
@@ -533,6 +565,16 @@ function outputSummaryValue(event: AgentEvent, key: string): unknown {
 function summaryValue(value: unknown, key: string): unknown {
   if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
   return (value as Record<string, unknown>)[key];
+}
+
+function formatMscPassengers(result: MatchResultDTO): string {
+  const metadata = result.metadata;
+  if (!metadata || typeof metadata !== "object") return "";
+  const msc = metadata.msc;
+  if (!msc || typeof msc !== "object" || Array.isArray(msc)) return "";
+  const surnames = (msc as { passenger_surnames?: unknown }).passenger_surnames;
+  if (!Array.isArray(surnames)) return "";
+  return surnames.filter((item): item is string => typeof item === "string" && item.length > 0).join(", ");
 }
 
 function formatJson(value: unknown): string {
@@ -572,6 +614,7 @@ function statusLabel(trace: TraceGroup, error: AgentEvent | undefined, hasReuse 
   if (trace.result?.matched && hasReuse) return "Match ambiguo";
   if (trace.result?.matched) return "Match";
   if (trace.result?.ambiguous) return "Ambiguo";
+  if (trace.result && formatMscPassengers(trace.result)) return "Info MSC";
   if (trace.result) return "No match";
   if (trace.events.some((event) => eventName(event) === "txn_end")) return "Completata";
   return "In corso";

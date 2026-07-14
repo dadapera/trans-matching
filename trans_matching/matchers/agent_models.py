@@ -27,6 +27,7 @@ class AgentMatchResult:
     strategy: str = "generic"
     trace_id: str = ""
     row_number: int = 0
+    metadata: dict = field(default_factory=dict)
 
     @property
     def is_matched(self) -> bool:

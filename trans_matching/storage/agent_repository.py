@@ -46,7 +46,8 @@ CREATE TABLE IF NOT EXISTS agent_match_results (
     agent_reason TEXT,
     agent_strategy TEXT,
     gestionale_entries_json TEXT,
-    alternatives_json TEXT
+    alternatives_json TEXT,
+    metadata_json TEXT
 );
 
 CREATE TABLE IF NOT EXISTS agent_trace_events (
@@ -100,6 +101,11 @@ def _migrate_schema(conn: sqlite3.Connection) -> None:
         )
     if "expected_transactions" not in columns:
         conn.execute("ALTER TABLE agent_runs ADD COLUMN expected_transactions INTEGER")
+    result_columns = {
+        row[1] for row in conn.execute("PRAGMA table_info(agent_match_results)").fetchall()
+    }
+    if "metadata_json" not in result_columns:
+        conn.execute("ALTER TABLE agent_match_results ADD COLUMN metadata_json TEXT")
 
 
 def _serialize_gestionale(entries: list[Transaction]) -> str:
@@ -172,6 +178,7 @@ def _result_insert_params(run_id: int, result: AgentMatchResult) -> tuple:
         result.strategy,
         _serialize_gestionale(result.gestionale),
         _serialize_alternatives(result.alternatives),
+        json.dumps(result.metadata, ensure_ascii=False),
     )
 
 
@@ -209,8 +216,8 @@ def save_agent_match_result(
                 run_id, row_number, matched, trace_id,
                 card_date, card_description, card_amount,
                 agent_confidence, agent_reason, agent_strategy,
-                gestionale_entries_json, alternatives_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                gestionale_entries_json, alternatives_json, metadata_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             _result_insert_params(run_id, result),
         )
@@ -409,8 +416,8 @@ def save_agent_run(
                     run_id, row_number, matched, trace_id,
                     card_date, card_description, card_amount,
                     agent_confidence, agent_reason, agent_strategy,
-                    gestionale_entries_json, alternatives_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    gestionale_entries_json, alternatives_json, metadata_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 [_result_insert_params(saved_run_id, result) for result in results],
             )
@@ -533,4 +540,5 @@ def _row_to_agent_result(row: sqlite3.Row) -> AgentMatchResult:
         strategy=row["agent_strategy"] or "generic",
         trace_id=row["trace_id"] or "",
         row_number=row["row_number"],
+        metadata=json.loads(row["metadata_json"] or "{}") if "metadata_json" in row.keys() else {},
     )

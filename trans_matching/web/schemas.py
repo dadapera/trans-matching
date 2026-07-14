@@ -36,6 +36,7 @@ class MatchResultDTO(BaseModel):
     gestionale: list[TransactionDTO]
     alternatives: list[MatchAlternativeDTO]
     ambiguous: bool = False
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class AgentEventDTO(BaseModel):
@@ -116,6 +117,7 @@ def match_result_to_dto(result: AgentMatchResult) -> MatchResultDTO:
         gestionale=[_txn_to_dto(txn) for txn in result.gestionale],
         alternatives=[_alt_to_dto(alt) for alt in result.alternatives],
         ambiguous=result.is_ambiguous,
+        metadata=result.metadata,
     )
 
 

@@ -23,6 +23,7 @@ export interface MatchResultDTO {
   gestionale: TransactionDTO[];
   alternatives: MatchAlternativeDTO[];
   ambiguous: boolean;
+  metadata?: Record<string, unknown>;
 }
 
 export interface UploadResponse {

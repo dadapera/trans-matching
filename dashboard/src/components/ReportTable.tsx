@@ -85,7 +85,7 @@ export function ReportTable({
             <th>Importo</th>
             <th>Esito</th>
             <th>Conf.</th>
-            <th>Gestionale</th>
+            <th>Gestionale / Info</th>
             <th>Motivazione</th>
           </tr>
         </thead>
@@ -122,6 +122,9 @@ export function ReportTable({
                 <span className={`conf conf--${row.confidence}`}>{row.confidence}</span>
               </td>
               <td className="cell-gestionale">
+                {formatMscPassengers(row) && (
+                  <div className="alt-line">MSC passeggeri: {formatMscPassengers(row)}</div>
+                )}
                 {row.gestionale.length > 0
                   ? row.gestionale.map((g) => (
                       <div key={g.identificativo || g.description}>
@@ -135,7 +138,7 @@ export function ReportTable({
                           Alt: {formatAlternativeLabel(a)} ({a.confidence})
                         </div>
                       ))
-                    : "—"}
+                    : formatMscPassengers(row) ? null : "—"}
                 {reusedGestionaleLabels(row, reuseMap).map((label) => (
                   <div key={label} className="alt-line">
                     Ambiguità: {label}
@@ -163,5 +166,16 @@ function outcomeLabel(row: MatchResultDTO, reuseMap: Map<string, number[]>): str
   if (hasGestionaleReuse(row, reuseMap)) return "Match ambiguo";
   if (row.matched) return "Match";
   if (row.ambiguous) return "Ambiguo";
+  if (formatMscPassengers(row)) return "Info MSC";
   return "—";
+}
+
+function formatMscPassengers(row: MatchResultDTO): string {
+  const metadata = row.metadata;
+  if (!metadata || typeof metadata !== "object") return "";
+  const msc = metadata.msc;
+  if (!msc || typeof msc !== "object" || Array.isArray(msc)) return "";
+  const surnames = (msc as { passenger_surnames?: unknown }).passenger_surnames;
+  if (!Array.isArray(surnames)) return "";
+  return surnames.filter((item): item is string => typeof item === "string" && item.length > 0).join(", ");
 }

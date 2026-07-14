@@ -7,6 +7,13 @@ from trans_matching.email.links import build_gmail_message_link, build_gmail_sea
 
 
 @dataclass(frozen=True)
+class EmailAttachment:
+    filename: str
+    content_type: str
+    data: bytes
+
+
+@dataclass(frozen=True)
 class EmailMessage:
     uid: str
     subject: str
@@ -15,6 +22,7 @@ class EmailMessage:
     body: str = ""
     html_body: str = ""
     message_id: str = ""
+    attachments: tuple[EmailAttachment, ...] = ()
 
     @property
     def text_content(self) -> str:
@@ -40,6 +48,7 @@ class EmailSearchQuery:
     since: date | None = None
     before: date | None = None
     include_body: bool = False
+    include_attachments: bool = False
     max_results: int | None = None
     max_body_bytes: int | None = None
 
