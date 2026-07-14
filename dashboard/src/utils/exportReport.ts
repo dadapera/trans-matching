@@ -2,6 +2,7 @@ import ExcelJS from "exceljs";
 import type { MatchResultDTO, ResultFilter } from "../types";
 import { formatAlternativeLabel } from "../utils/alternatives";
 import { formatGestionaleMatchLine } from "../utils/gestionaleMatch";
+import { buildGestionaleReuseMap, hasGestionaleReuse, reusedGestionaleLabels } from "./gestionaleReuse";
 
 const FILTER_SUFFIX: Record<ResultFilter, string> = {
   all: "tutti",
@@ -21,23 +22,28 @@ const COLORS = {
 
 const WRAP_COLUMNS = new Set([3, 7, 8]);
 
-function outcomeLabel(row: MatchResultDTO): string {
+function outcomeLabel(row: MatchResultDTO, reuseMap: Map<string, number[]>): string {
+  if (hasGestionaleReuse(row, reuseMap)) return "Match ambiguo";
   if (row.matched) return "Match";
   if (row.ambiguous) return "Ambiguo";
   return "Nessun match";
 }
 
-function rowFill(row: MatchResultDTO): string {
+function rowFill(row: MatchResultDTO, reuseMap: Map<string, number[]>): string {
+  if (hasGestionaleReuse(row, reuseMap)) return COLORS.ambiguous;
   if (row.matched) return COLORS.matched;
   if (row.ambiguous) return COLORS.ambiguous;
   return COLORS.unmatched;
 }
 
-function formatGestionaleCell(row: MatchResultDTO): string {
+function formatGestionaleCell(row: MatchResultDTO, reuseMap: Map<string, number[]>): string {
+  const reuseLabels = reusedGestionaleLabels(row, reuseMap);
+  const reuseText = reuseLabels.map((label) => `Ambiguità: ${label}`).join("\n");
   if (row.gestionale.length > 0) {
-    return row.gestionale
+    const rows = row.gestionale
       .map((item) => formatGestionaleMatchLine(item.identificativo, item.description, item.amount))
       .join("\n");
+    return reuseText ? `${rows}\n${reuseText}` : rows;
   }
   if (row.alternatives.length > 0) {
     return row.alternatives
@@ -74,6 +80,7 @@ export async function exportReportXlsx(
   filter: ResultFilter,
 ): Promise<void> {
   if (rows.length === 0) return;
+  const reuseMap = buildGestionaleReuseMap(rows);
 
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "Trans Matching";
@@ -102,9 +109,9 @@ export async function exportReportXlsx(
       date: row.card.date,
       description: row.card.description,
       amount: parseAmount(row.card.amount),
-      outcome: outcomeLabel(row),
+      outcome: outcomeLabel(row, reuseMap),
       confidence: row.confidence,
-      gestionale: formatGestionaleCell(row),
+      gestionale: formatGestionaleCell(row, reuseMap),
       reason: row.reason,
       strategy: row.strategy,
       traceId: row.trace_id,
@@ -135,8 +142,8 @@ export async function exportReportXlsx(
     if (rowNumber === 1) return;
 
     const source = rows[rowNumber - 2];
-    const fill = rowFill(source);
-    const gestionaleLines = formatGestionaleCell(source).split("\n").length;
+    const fill = rowFill(source, reuseMap);
+    const gestionaleLines = formatGestionaleCell(source, reuseMap).split("\n").length;
     const reasonLines = (source.reason || "").split("\n").length;
     const lineCount = Math.max(gestionaleLines, reasonLines, 1);
     excelRow.height = Math.min(120, 18 + lineCount * 14);

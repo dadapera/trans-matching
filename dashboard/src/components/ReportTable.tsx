@@ -4,6 +4,11 @@ import type { MatchResultDTO, ResultFilter } from "../types";
 import { filterResults } from "../types";
 import { formatAlternativeLabel } from "../utils/alternatives";
 import { formatGestionaleMatchLabel } from "../utils/gestionaleMatch";
+import {
+  buildGestionaleReuseMap,
+  hasGestionaleReuse,
+  reusedGestionaleLabels,
+} from "../utils/gestionaleReuse";
 import { exportReportXlsx } from "../utils/exportReport";
 import { ResultSummary } from "./ResultSummary";
 
@@ -31,7 +36,10 @@ export function ReportTable({
     );
   }
 
-  const visibleResults = filterResults(results, resultFilter);
+  const reuseMap = buildGestionaleReuseMap(results);
+  const visibleResults = resultFilter === "ambiguous"
+    ? results.filter((row) => row.ambiguous || hasGestionaleReuse(row, reuseMap))
+    : filterResults(results, resultFilter);
 
   const handleExport = async () => {
     if (visibleResults.length === 0 || exporting) return;
@@ -86,7 +94,9 @@ export function ReportTable({
             <tr
               key={row.row_number}
               className={
-                row.matched
+                hasGestionaleReuse(row, reuseMap)
+                  ? "row--ambiguous"
+                  : row.matched
                   ? "row--matched"
                   : row.ambiguous
                     ? "row--ambiguous"
@@ -106,7 +116,7 @@ export function ReportTable({
               <td className="cell-desc">{row.card.description}</td>
               <td className="mono">€{row.card.amount}</td>
               <td>
-                <span className={`outcome outcome--${outcomeKey(row)}`}>{outcomeLabel(row)}</span>
+                <span className={`outcome outcome--${outcomeKey(row, reuseMap)}`}>{outcomeLabel(row, reuseMap)}</span>
               </td>
               <td>
                 <span className={`conf conf--${row.confidence}`}>{row.confidence}</span>
@@ -126,6 +136,11 @@ export function ReportTable({
                         </div>
                       ))
                     : "—"}
+                {reusedGestionaleLabels(row, reuseMap).map((label) => (
+                  <div key={label} className="alt-line">
+                    Ambiguità: {label}
+                  </div>
+                ))}
               </td>
               <td className="cell-reason">{row.reason || "—"}</td>
             </tr>
@@ -137,13 +152,15 @@ export function ReportTable({
   );
 }
 
-function outcomeKey(row: MatchResultDTO): string {
+function outcomeKey(row: MatchResultDTO, reuseMap: Map<string, number[]>): string {
+  if (hasGestionaleReuse(row, reuseMap)) return "ambiguous";
   if (row.matched) return "matched";
   if (row.ambiguous) return "ambiguous";
   return "unmatched";
 }
 
-function outcomeLabel(row: MatchResultDTO): string {
+function outcomeLabel(row: MatchResultDTO, reuseMap: Map<string, number[]>): string {
+  if (hasGestionaleReuse(row, reuseMap)) return "Match ambiguo";
   if (row.matched) return "Match";
   if (row.ambiguous) return "Ambiguo";
   return "—";

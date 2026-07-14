@@ -12,6 +12,7 @@ import type { AgentEvent, MatchResultDTO, ResultFilter } from "../types";
 import { matchesResultFilter } from "../types";
 import { formatAlternativeLabel } from "../utils/alternatives";
 import { formatGestionaleMatchLabel } from "../utils/gestionaleMatch";
+import { buildGestionaleReuseMap, hasGestionaleReuse, reusedGestionaleLabels } from "../utils/gestionaleReuse";
 
 interface Props {
   events: AgentEvent[];
@@ -75,6 +76,8 @@ export function LiveFeed({
     return !ev.trace_id && LIVE_EVENTS.has(name);
   });
 
+  const reuseMap = useMemo(() => buildGestionaleReuseMap(results), [results]);
+
   const traces = useMemo(() => {
     const groups = new Map<string, TraceGroup>();
 
@@ -96,9 +99,12 @@ export function LiveFeed({
 
     return Array.from(groups.values())
       .filter((group) => !filterTraceId || group.traceId === filterTraceId)
-      .filter((group) => matchesResultFilter(group.result, resultFilter))
+      .filter((group) => {
+        if (resultFilter !== "ambiguous") return matchesResultFilter(group.result, resultFilter);
+        return Boolean(group.result && (group.result.ambiguous || hasGestionaleReuse(group.result, reuseMap)));
+      })
       .sort((a, b) => traceSortKey(a) - traceSortKey(b));
-  }, [events, filterTraceId, resultFilter, results]);
+  }, [events, filterTraceId, resultFilter, results, reuseMap]);
 
   return (
     <div className="live-feed">
@@ -147,6 +153,8 @@ export function LiveFeed({
             key={trace.traceId}
             trace={trace}
             debugMode={debugMode}
+            hasReuse={trace.result ? hasGestionaleReuse(trace.result, reuseMap) : false}
+            reuseLabels={trace.result ? reusedGestionaleLabels(trace.result, reuseMap) : []}
             focused={trace.traceId === filterTraceId}
             onFilterTrace={onFilterTrace}
           />
@@ -159,11 +167,15 @@ export function LiveFeed({
 function TraceCard({
   trace,
   debugMode,
+  hasReuse,
+  reuseLabels,
   focused,
   onFilterTrace,
 }: {
   trace: TraceGroup;
   debugMode: boolean;
+  hasReuse: boolean;
+  reuseLabels: string[];
   focused: boolean;
   onFilterTrace: (id: string | null) => void;
 }) {
@@ -171,7 +183,7 @@ function TraceCard({
   const end = trace.events.find((event) => eventName(event) === "txn_end");
   const error = trace.events.find((event) => eventName(event) === "error");
   const title = transactionTitle(start, trace.result);
-  const outcome = trace.result ? outcomeKey(trace.result) : error ? "error" : end ? "done" : "running";
+  const outcome = trace.result ? outcomeKey(trace.result, hasReuse) : error ? "error" : end ? "done" : "running";
 
   return (
     <article className={`trace-card trace-card--${outcome} ${focused ? "trace-card--focused" : ""}`}>
@@ -190,14 +202,14 @@ function TraceCard({
           <h3>{title}</h3>
           <p>{transactionMeta(start, trace.result)}</p>
         </div>
-        <span className={`trace-status trace-status--${outcome}`}>{statusLabel(trace, error)}</span>
+        <span className={`trace-status trace-status--${outcome}`}>{statusLabel(trace, error, hasReuse)}</span>
       </header>
 
       <div className="trace-timeline">
         {buildSteps(trace).map((step, index) => (
           <TraceStep key={`${step.event.ts ?? step.name}-${index}`} step={step} debugMode={debugMode} />
         ))}
-        {trace.result && <ResultStep result={trace.result} debugMode={debugMode} />}
+        {trace.result && <ResultStep result={trace.result} debugMode={debugMode} reuseLabels={reuseLabels} />}
       </div>
     </article>
   );
@@ -227,18 +239,30 @@ function TraceStep({ step, debugMode }: { step: TraceStepData; debugMode: boolea
   );
 }
 
-function ResultStep({ result, debugMode }: { result: MatchResultDTO; debugMode: boolean }) {
+function ResultStep({
+  result,
+  debugMode,
+  reuseLabels,
+}: {
+  result: MatchResultDTO;
+  debugMode: boolean;
+  reuseLabels: string[];
+}) {
+  const hasReuse = reuseLabels.length > 0;
   return (
-    <div className={`trace-step trace-step--result trace-step--${outcomeKey(result)}`}>
+    <div className={`trace-step trace-step--result trace-step--${outcomeKey(result, hasReuse)}`}>
       <span className="trace-step__icon">
         {result.matched ? <CheckCircle2 size={16} /> : <HelpCircle size={16} />}
       </span>
       <div className="trace-step__body">
         <div className="trace-step__head">
-          <span>Risultato: {result.matched ? "match" : result.ambiguous ? "ambiguo" : "nessun match"}</span>
+          <span>Risultato: {hasReuse ? "match ambiguo" : result.matched ? "match" : result.ambiguous ? "ambiguo" : "nessun match"}</span>
           <span className={`conf conf--${result.confidence}`}>{result.confidence}</span>
         </div>
         <p>{result.reason || "Nessun razionale disponibile."}</p>
+        {reuseLabels.map((label) => (
+          <p key={label}>Ambiguità: {label}</p>
+        ))}
         <details className="trace-details">
           <summary>Apri info e razionale</summary>
           <div className="result-detail">
@@ -543,8 +567,9 @@ function transactionMeta(start: AgentEvent | undefined, result: MatchResultDTO |
   return `${date} · €${amount}${category}`;
 }
 
-function statusLabel(trace: TraceGroup, error: AgentEvent | undefined): string {
+function statusLabel(trace: TraceGroup, error: AgentEvent | undefined, hasReuse = false): string {
   if (error) return "Errore";
+  if (trace.result?.matched && hasReuse) return "Match ambiguo";
   if (trace.result?.matched) return "Match";
   if (trace.result?.ambiguous) return "Ambiguo";
   if (trace.result) return "No match";
@@ -552,7 +577,8 @@ function statusLabel(trace: TraceGroup, error: AgentEvent | undefined): string {
   return "In corso";
 }
 
-function outcomeKey(result: MatchResultDTO): string {
+function outcomeKey(result: MatchResultDTO, hasReuse = false): string {
+  if (hasReuse) return "ambiguous";
   if (result.matched) return "matched";
   if (result.ambiguous) return "ambiguous";
   return "unmatched";

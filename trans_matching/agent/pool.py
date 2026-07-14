@@ -78,17 +78,17 @@ class GestionalePool:
 
     @property
     def available_count(self) -> int:
-        return sum(1 for txn in self._all if self.is_available(txn))
+        return len(self._all)
 
     @property
     def assigned_count(self) -> int:
         return len(self._assignments)
 
     def is_available(self, txn: Transaction) -> bool:
-        return self._key(txn) not in self._assignments
+        return True
 
     def available(self) -> list[Transaction]:
-        return [txn for txn in self._all if self.is_available(txn)]
+        return list(self._all)
 
     def get_assignment(self, txn: Transaction) -> RowAssignment | None:
         return self._assignments.get(self._key(txn))
@@ -115,10 +115,6 @@ class GestionalePool:
         identificativi: list[str],
         card_row_number: int,
     ) -> bool:
-        for txn in self.find_by_identificativi(identificativi):
-            assignment = self.get_assignment(txn)
-            if assignment is not None and assignment.card_row_number != card_row_number:
-                return True
         return False
 
     def find_by_identificativi(self, identificativi: list[str]) -> list[Transaction]:
@@ -135,13 +131,7 @@ class GestionalePool:
 
     def format_row(self, txn: Transaction) -> str:
         base = f"{txn.identificativo}|{txn.date}|{txn.amount}|{txn.description}"
-        assignment = self.get_assignment(txn)
-        if assignment is None:
-            return f"{base}  [available]"
-        return (
-            f"{base}  [matched → txn #{assignment.card_row_number}, "
-            f"conf: {assignment.confidence}]"
-        )
+        return f"{base}  [available]"
 
     def search(
         self,
@@ -187,10 +177,7 @@ class GestionalePool:
                 score -= 1
 
             if score > 0 or (not text_norm and amount is None):
-                if not self.is_available(txn) and score > 0:
-                    score -= 3
-                if score > 0:
-                    results.append((score, txn))
+                results.append((score, txn))
 
         results.sort(key=lambda item: (-item[0], item[1].date, item[1].identificativo))
         return [txn for _, txn in results[:limit]]
@@ -224,8 +211,6 @@ class GestionalePool:
                 score += 2
             if amount is not None and txn.amount == amount:
                 score += 3
-            if not self.is_available(txn):
-                score -= 3
             if score > 0:
                 scored.append((score, txn))
 

@@ -97,19 +97,6 @@ def run_agent_matching(
             result = match_one(session)
             result.row_number = row_number
             result.trace_id = trace_id
-            if result.matched:
-                assigned = pool.assign(
-                    result.gestionale,
-                    card_row_number=row_number,
-                    confidence=result.confidence,
-                )
-                run_logger.log(
-                    "pool_update",
-                    trace_id=trace_id,
-                    assigned=assigned,
-                    available=pool.available_count,
-                    assigned_total=pool.assigned_count,
-                )
             results.append(result)
             if on_result is not None:
                 on_result(result)

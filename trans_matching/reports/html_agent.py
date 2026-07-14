@@ -19,7 +19,43 @@ def _confidence_badge(confidence: str) -> str:
     )
 
 
-def _agent_detail(result: AgentMatchResult) -> str:
+def _gestionale_reuse_key(txn) -> str:
+    if txn.identificativo.strip():
+        return txn.identificativo.strip().upper()
+    return f"{txn.date}|{txn.amount}|{txn.description}".upper()
+
+
+def _build_reuse_map(results: list[AgentMatchResult]) -> dict[str, list[int]]:
+    usage: dict[str, set[int]] = {}
+    for result in results:
+        row = result.row_number
+        keys = {_gestionale_reuse_key(txn) for txn in result.gestionale}
+        for key in keys:
+            usage.setdefault(key, set()).add(row)
+    return {key: sorted(rows) for key, rows in usage.items()}
+
+
+def _reuse_labels(result: AgentMatchResult, reuse_map: dict[str, list[int]]) -> list[str]:
+    labels: list[str] = []
+    seen: set[str] = set()
+    for txn in result.gestionale:
+        key = _gestionale_reuse_key(txn)
+        if key in seen:
+            continue
+        seen.add(key)
+        rows = reuse_map.get(key, [])
+        if len(rows) <= 1:
+            continue
+        label = txn.identificativo or f"{txn.date}|{txn.amount}|{txn.description}"
+        labels.append(f"{label} anche su transazioni #{', #'.join(str(row) for row in rows)}")
+    return labels
+
+
+def _has_reuse(result: AgentMatchResult, reuse_map: dict[str, list[int]]) -> bool:
+    return bool(_reuse_labels(result, reuse_map))
+
+
+def _agent_detail(result: AgentMatchResult, reuse_map: dict[str, list[int]]) -> str:
     parts: list[str] = []
 
     if result.gestionale:
@@ -44,6 +80,15 @@ def _agent_detail(result: AgentMatchResult) -> str:
             f'<span class="llm-reason-label">Motivazione:</span> '
             f'{_html_escape(result.reason)}'
             "</span>"
+        )
+
+    reuse_labels = _reuse_labels(result, reuse_map)
+    if reuse_labels:
+        parts.append(
+            '<span class="reuse-warning">'
+            '<span class="reuse-warning-label">Ambiguità SIAP:</span> '
+            + "<br>".join(_html_escape(label) for label in reuse_labels)
+            + "</span>"
         )
 
     if result.alternatives:
@@ -93,13 +138,19 @@ def generate_agent_html_report(
         raise ValueError("run è richiesto quando si passano results in memoria")
 
     matched = sum(1 for result in results if result.matched)
-    ambiguous = sum(1 for result in results if result.is_ambiguous)
+    reuse_map = _build_reuse_map(results)
+    ambiguous = sum(1 for result in results if result.is_ambiguous or _has_reuse(result, reuse_map))
     unmatched = len(results) - matched
 
     rows: list[str] = []
     trace_sections: list[str] = []
     for index, result in enumerate(results, start=1):
-        if result.matched:
+        has_reuse = _has_reuse(result, reuse_map)
+        if result.matched and has_reuse:
+            icon = "⚠️"
+            row_class = "ambiguous"
+            status_text = "Match ambiguo"
+        elif result.matched:
             icon = "✅"
             row_class = "match"
             status_text = "Match"
@@ -120,7 +171,7 @@ def generate_agent_html_report(
   <td class="description">{_html_escape(result.card.description)}</td>
   <td class="amount">{_format_amount(result.card.amount)}</td>
   <td class="status-text">{status_text}</td>
-  <td>{_agent_detail(result)}</td>
+  <td>{_agent_detail(result, reuse_map)}</td>
 </tr>"""
         )
         if result.trace_id:
@@ -139,6 +190,8 @@ def generate_agent_html_report(
     tr.ambiguous .status-text { color: #b45309; }
     .alternatives { display: block; margin-top: 0.35rem; font-size: 0.8rem; color: #92400e; }
     .alternatives-label { font-weight: 600; }
+    .reuse-warning { display: block; margin-top: 0.35rem; font-size: 0.8rem; color: #92400e; background: #fffbeb; border-radius: 4px; padding: 0.35rem 0.5rem; }
+    .reuse-warning-label { font-weight: 600; }
     .trace-link { display: block; margin-top: 0.35rem; font-size: 0.75rem; }
     .trace-section { margin-top: 2rem; padding: 1rem; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; }
     """

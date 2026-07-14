@@ -1,4 +1,5 @@
 import type { MatchResultDTO, ResultFilter } from "../types";
+import { buildGestionaleReuseMap, hasGestionaleReuse } from "../utils/gestionaleReuse";
 
 interface Props {
   results: MatchResultDTO[];
@@ -7,8 +8,9 @@ interface Props {
 }
 
 export function ResultSummary({ results, filter, onFilterChange }: Props) {
+  const reuseMap = buildGestionaleReuseMap(results);
   const matched = results.filter((row) => row.matched).length;
-  const ambiguous = results.filter((row) => row.ambiguous).length;
+  const ambiguous = results.filter((row) => row.ambiguous || hasGestionaleReuse(row, reuseMap)).length;
 
   const toggle = (next: ResultFilter) => {
     onFilterChange(filter === next ? "all" : next);

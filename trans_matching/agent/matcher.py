@@ -72,8 +72,7 @@ Non usare confidence alto/medio se restano alternative equivalenti: elencale in 
 Se non c'è evidenza sufficiente, lascia identificativi vuoti e confidence basso.
 
 Formati gestionale: identificativo|data|importo|descrizione  [available]
-oppure  [matched → txn #N, conf: alto|medio|basso] se già abbinate.
-Non riusare righe [matched] se esistono alternative [available] equivalenti."""
+Puoi riusare la stessa pratica/riga SIAP su più transazioni quando l'evidenza lo giustifica; l'ambiguità sarà evidenziata nel report per revisione umana."""
 
 
 def get_matching_agent():
@@ -254,7 +253,7 @@ Gestionale (tutte le righe; [available] o già abbinate):
 {session.pool.format_rows()}
 
 Finestra date suggerita: ±{session.date_window_days} giorni.
-Se una riga è [matched → txn #N], preferisci alternative [available] salvo evidenza forte.
+Puoi riusare una pratica SIAP già scelta per altre transazioni se è il match più plausibile.
 Restituisci identificativi (1 o più), confidence, reason, alternatives se ambiguo."""
 
 

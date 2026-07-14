@@ -305,7 +305,7 @@ def apply_confidence_gate(
     pool,
     card_row_number: int,
 ) -> tuple[bool, list[Transaction], Confidence, str | None]:
-    """Match confermato solo con confidence alto/medio, identificativi risolvibili e senza conflitti."""
+    """Match confermato con confidence alto/medio e identificativi risolvibili."""
     strong_alternatives = [
         alt for alt in alternatives if alt.confidence in ("alto", "medio")
     ]
@@ -314,9 +314,6 @@ def apply_confidence_gate(
 
     if confidence not in ("alto", "medio") or not identificativi:
         return False, [], confidence if confidence == "basso" else "basso", None
-
-    if pool.has_assignment_conflict(identificativi, card_row_number):
-        return False, [], "basso", "riga già assegnata ad altra transazione"
 
     resolved = pool.find_by_identificativi(identificativi)
     if not resolved:
