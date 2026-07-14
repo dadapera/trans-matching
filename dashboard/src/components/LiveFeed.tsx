@@ -307,6 +307,7 @@ function buildSteps(trace: TraceGroup): TraceStepData[] {
 
 function eventIcon(name: string, event: AgentEvent) {
   if (name === "error" || name === "run_error") return <AlertCircle size={16} />;
+  if (isExpediaContextTool(event)) return <Mail size={16} />;
   if (name === "tool_call") return <Wrench size={16} />;
   if (name === "email_search") return <Mail size={16} />;
   if (name === "agent_step") return <Bot size={16} />;
@@ -343,6 +344,7 @@ function formatEvent(name: string, event: AgentEvent): string {
     case "tool_call": {
       const tool = event.tool as string | undefined;
       const phase = event.phase as string | undefined;
+      if (tool === "expedia_context") return `Contesto Expedia: ${compactExpediaContextSummary(event.output_summary)}`;
       if (phase === "start") return `→ ${tool}`;
       return `← ${tool ?? "tool"}: ${formatSummary(event.output_summary).slice(0, 120)}`;
     }
@@ -377,6 +379,7 @@ function stepTitle(name: string, event: AgentEvent): string {
     case "router_classify":
       return `Classifico la transazione: ${event.category ?? "categoria non definita"}`;
     case "tool_call":
+      if (isExpediaContextTool(event)) return "Raccolgo contesto Expedia";
       return `Uso tool ${String(event.tool ?? "tool")}`;
     case "email_search":
       return `Cerco email ${String(event.provider ?? "")}`.trim();
@@ -407,6 +410,7 @@ function stepSummary(name: string, event: AgentEvent): string {
       return `Uso questa categoria per scegliere strategia e tool più adatti.`;
     case "tool_call": {
       const phase = event.phase as string | undefined;
+      if (isExpediaContextTool(event)) return compactExpediaContextSummary(event.output_summary);
       if (phase === "start") return "Il tool è stato invocato; i dettagli sono disponibili cliccando.";
       return compactToolSummary(event.output_summary);
     }
@@ -433,6 +437,15 @@ function stepDetails(event: AgentEvent, debugMode: boolean): string | null {
   const name = eventName(event);
   if (debugMode) return formatJson(event);
   if (name === "tool_call") {
+    if (isExpediaContextTool(event)) {
+      return formatJson({
+        status: outputSummaryValue(event, "status"),
+        booking_code: outputSummaryValue(event, "booking_code"),
+        candidate_strategy: outputSummaryValue(event, "candidate_strategy"),
+        candidates: outputSummaryValue(event, "candidates"),
+        duration_ms: event.duration_ms,
+      });
+    }
     return formatJson({
       input: event.input,
       output_summary: event.output_summary,
@@ -463,6 +476,39 @@ function formatSummary(value: unknown): string {
 function compactToolSummary(value: unknown): string {
   const text = formatSummary(value);
   return text ? text.slice(0, 180) : "Tool completato.";
+}
+
+function compactExpediaContextSummary(value: unknown): string {
+  const status = String(summaryValue(value, "status") ?? "");
+  const bookingCode = summaryValue(value, "booking_code");
+  const candidates = summaryValue(value, "candidates");
+  const strategy = summaryValue(value, "candidate_strategy");
+
+  if (status === "candidates_found") {
+    return `${candidates ?? 0} candidati gestionale trovati${bookingCode ? ` per ${bookingCode}` : ""}${strategy ? ` (${strategy})` : ""}.`;
+  }
+  if (status === "no_candidates") {
+    return `Email Expedia trovata${bookingCode ? ` per ${bookingCode}` : ""}, ma nessun candidato gestionale.`;
+  }
+  if (status === "no_email") {
+    return `Nessuna email Expedia trovata${bookingCode ? ` per ${bookingCode}` : ""}.`;
+  }
+  if (status === "no_booking_code") return "Codice prenotazione Expedia non trovato.";
+  if (candidates !== undefined) return `${candidates} candidati gestionale trovati.`;
+  return compactToolSummary(value);
+}
+
+function isExpediaContextTool(event: AgentEvent): boolean {
+  return eventName(event) === "tool_call" && event.tool === "expedia_context";
+}
+
+function outputSummaryValue(event: AgentEvent, key: string): unknown {
+  return summaryValue(event.output_summary, key);
+}
+
+function summaryValue(value: unknown, key: string): unknown {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  return (value as Record<string, unknown>)[key];
 }
 
 function formatJson(value: unknown): string {

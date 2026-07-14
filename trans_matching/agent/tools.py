@@ -123,21 +123,16 @@ def collect_document_group_context(
     return payload
 
 
-@tool
-def search_expedia(booking_code: str = "") -> str:
-    """Cerca email Expedia per codice prenotazione EG*TRVL e estrae hotel/ospite."""
-    session = get_session()
-    payload = collect_expedia_context(session, booking_code=booking_code)
-    return json.dumps(payload, ensure_ascii=False)
-
-
 def collect_expedia_context(session, booking_code: str = "") -> dict:
-    """Raccoglie il contesto Expedia in modo deterministico per tool e prefetch."""
+    """Raccoglie il contesto Expedia in modo deterministico prima dell'LLM."""
     started = time.perf_counter()
     code = booking_code.strip() or extract_booking_code(session.card.description) or ""
     if not code:
-        payload = {"error": "Codice prenotazione Expedia non trovato"}
-        _log_tool(session, "search_expedia", payload, started)
+        payload = {
+            "status": "no_booking_code",
+            "error": "Codice prenotazione Expedia non trovato",
+        }
+        _log_tool(session, "expedia_context", payload, started)
         return payload
 
     search_result = search_expedia_emails(
@@ -156,37 +151,62 @@ def collect_expedia_context(session, booking_code: str = "") -> dict:
     emails = search_result.emails
     if not emails:
         payload = {
+            "status": "no_email",
             "booking_code": code,
             "email_found": False,
             "search_attempts": search_result.attempts,
         }
-        _log_tool(session, "search_expedia", payload, started)
+        _log_tool(session, "expedia_context", payload, started)
         return payload
 
     matched_email = pick_best_email(emails, code)
     hotel, guest = parse_expedia_email(matched_email.body, matched_email.html_body)
     email_text = format_llm_email_text(matched_email.body, matched_email.html_body)
     log_config = get_agent_log_config()
+    expedia_date_window_days = max(session.date_window_days, 30)
     gestionale_hits = session.pool.search_by_guest_hotel(
         guest=guest,
         hotel=hotel,
         amount=session.card.amount,
         card_date=session.card.date,
-        date_window_days=session.date_window_days,
+        date_window_days=expedia_date_window_days,
     )
+    candidate_strategy = "guest_hotel"
+    if not gestionale_hits and guest and hotel:
+        gestionale_hits = session.pool.search_by_guest_hotel(
+            guest=guest,
+            hotel=None,
+            amount=session.card.amount,
+            card_date=session.card.date,
+            date_window_days=expedia_date_window_days,
+        )
+        candidate_strategy = "guest_only"
     payload = {
+        "status": "candidates_found" if gestionale_hits else "no_candidates",
         "booking_code": code,
         "email_found": True,
         "search_strategy": search_result.strategy,
         "search_attempts": search_result.attempts,
         "hotel": hotel,
         "guest": guest,
+        "candidate_strategy": candidate_strategy,
+        "date_window_days": expedia_date_window_days,
         "email_text": email_text if log_config.log_email_body else email_text[:300],
         "gestionale_candidates": [
             session.pool.format_row(txn) for txn in gestionale_hits[:10]
         ],
     }
-    _log_tool(session, "search_expedia", {"booking_code": code, "candidates": len(gestionale_hits)}, started)
+    _log_tool(
+        session,
+        "expedia_context",
+        {
+            "booking_code": code,
+            "status": payload["status"],
+            "candidate_strategy": candidate_strategy,
+            "candidates": len(gestionale_hits),
+        },
+        started,
+    )
     return payload
 
 
@@ -253,7 +273,6 @@ AGENT_TOOLS = [
     compare_amount,
     check_document_group_sum,
     check_sum,
-    search_expedia,
     search_msc,
 ]
 

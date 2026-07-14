@@ -55,7 +55,8 @@ _SYSTEM_PROMPT = """Sei un agente contabile che abbina transazioni carta di cred
 Obiettivo: trovare il match più plausibile usando i tool disponibili.
 
 Workflow consigliato:
-1. Se la transazione è Expedia (EG*TRVL) → usa search_expedia, poi valuta i candidati gestionale o compare_amount.
+1. Se la transazione è Expedia (EG*TRVL) → usa il contesto Expedia deterministico già fornito, poi valuta i candidati gestionale o compare_amount.
+   Le pratiche Expedia possono avere più righe SIAP, storni o importi non identici: usa hotel/ospite/email come evidenza primaria e restituisci più identificativi quando il gruppo è coerente.
 2. Se è MSC (mscbook.it / MSC Cruises) → usa search_msc, poi valuta i candidati gestionale.
 3. Se l'importo potrebbe essere suddiviso su più righe dello stesso Documento+Codice Cliente → usa check_document_group_sum.
 4. Se resta una somma multi-riga non coperta dal documento → usa check_sum.
@@ -225,10 +226,10 @@ def _format_user_prompt(
     expedia_section = ""
     if expedia_context is not None:
         expedia_section = f"""
-Contesto Expedia già raccolto tramite search_expedia:
+Contesto Expedia deterministico già raccolto prima dell'LLM:
 {expedia_context}
 
-Usa questo contesto per decidere il match Expedia; richiama search_expedia solo se il contesto è insufficiente o contraddittorio.
+Usa questo contesto per decidere il match Expedia; i candidati possono includere split/storni della stessa pratica.
 """
     document_group_section = ""
     if document_group_context and document_group_context.get("count", 0) > 0:

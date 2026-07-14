@@ -2,7 +2,8 @@ from decimal import Decimal
 
 from trans_matching.agent.pool import GestionalePool
 from trans_matching.agent.sum_check import find_amount_combinations, find_document_amount_groups
-from trans_matching.agent.tools import apply_confidence_gate
+from trans_matching.agent.tools import AGENT_TOOLS, apply_confidence_gate
+from trans_matching.matchers.gestionale_text import hotel_matches
 from trans_matching.models import Transaction
 from trans_matching.parsers.amex import parse_amex_csv
 from trans_matching.verifiers.expedia_trvl import search_expedia_emails
@@ -203,6 +204,50 @@ def test_expedia_gate_rejects_transport_rows() -> None:
     assert reason is not None and "incoerente con Expedia" in reason
 
 
+def test_expedia_hotel_match_accepts_siap_truncated_suffix() -> None:
+    assert hotel_matches(
+        "322 THE ORCHID JAMN DEANGELIS GIACINTO",
+        "The Orchid Jamnagar",
+    )
+
+
+def test_expedia_guest_hotel_search_uses_extended_window() -> None:
+    pool = GestionalePool(
+        [
+            _txn(
+                identificativo="998 26 115",
+                date="19/02/2026",
+                amount="1344.00",
+                description="322 THE ORCHID JAMN DEANGELIS GIACINTO",
+            ),
+            _txn(
+                identificativo="998 26 135",
+                date="06/03/2026",
+                amount="-1344.00",
+                description="322 THE ORCHID JAMN DEANGELIS GIACINTO",
+            ),
+        ]
+    )
+
+    strict = pool.search_by_guest_hotel(
+        guest="GIACINTO DEANGELIS",
+        hotel="The Orchid Jamnagar",
+        amount=Decimal("-901.47"),
+        card_date="06/03/2026",
+        date_window_days=7,
+    )
+    extended = pool.search_by_guest_hotel(
+        guest="GIACINTO DEANGELIS",
+        hotel="The Orchid Jamnagar",
+        amount=Decimal("-901.47"),
+        card_date="06/03/2026",
+        date_window_days=30,
+    )
+
+    assert [txn.identificativo for txn in strict] == ["998 26 135"]
+    assert [txn.identificativo for txn in extended] == ["998 26 135", "998 26 115"]
+
+
 def test_expedia_email_search_falls_back_without_sender() -> None:
     class Reader:
         def __init__(self) -> None:
@@ -225,3 +270,10 @@ def test_expedia_email_search_falls_back_without_sender() -> None:
         ("EG*TRVL733123", "noreply@expediataap.it"),
         ("733123", None),
     ]
+
+
+def test_expedia_context_is_not_exposed_as_agent_tool() -> None:
+    tool_names = {tool.name for tool in AGENT_TOOLS}
+
+    assert "search_expedia" not in tool_names
+    assert {"compare_amount", "check_document_group_sum", "check_sum", "search_msc"} <= tool_names

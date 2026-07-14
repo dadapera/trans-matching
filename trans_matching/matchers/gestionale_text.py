@@ -123,9 +123,10 @@ def build_hotel_regex(email_hotel: str) -> re.Pattern[str] | None:
             return None
         return re.compile(rf"(?:\b|(?<=[\s-])){re.escape(word[:4])}\w*", re.IGNORECASE)
 
-    # Le prime 2 parole identificano quasi sempre l'hotel nel gestionale
+    # Le prime 2 parole identificano quasi sempre l'hotel nel gestionale.
+    # SIAP spesso tronca il secondo token: "Jamnagar" -> "JAMN".
     first, second = tokens[0], tokens[1]
-    pattern = rf"{re.escape(first)}(?:\s+|-){re.escape(second)}"
+    pattern = rf"{re.escape(first)}(?:\s+|-){re.escape(second[:4])}\w*"
 
     if len(tokens) >= 3:
         last = tokens[2]
