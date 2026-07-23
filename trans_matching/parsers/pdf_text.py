@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import statistics
 from collections import defaultdict
+from collections.abc import Callable
 from pathlib import Path
 
 from pypdf import PdfReader
+
+ProgressCallback = Callable[[int, int, str], None]
 
 
 def extract_pdf_text(path: Path) -> str:
@@ -17,7 +20,22 @@ def pdf_has_text_layer(path: Path) -> bool:
     return bool(extract_pdf_text(path).strip())
 
 
-def extract_pdf_lines_ocr(path: Path, *, dpi: int = 180) -> list[str]:
+def pdf_page_count(path: Path) -> int:
+    import fitz
+
+    doc = fitz.open(str(path))
+    try:
+        return len(doc)
+    finally:
+        doc.close()
+
+
+def extract_pdf_lines_ocr(
+    path: Path,
+    *,
+    dpi: int = 180,
+    on_progress: ProgressCallback | None = None,
+) -> list[str]:
     """OCR per PDF senza text layer (es. estratti Amex stampati in PDF)."""
     import fitz
     from rapidocr_onnxruntime import RapidOCR
@@ -25,13 +43,17 @@ def extract_pdf_lines_ocr(path: Path, *, dpi: int = 180) -> list[str]:
     ocr = RapidOCR()
     doc = fitz.open(str(path))
     lines: list[str] = []
+    total = len(doc)
 
-    for page in doc:
+    for index, page in enumerate(doc, start=1):
+        if on_progress is not None:
+            on_progress(index - 1, total, f"OCR carta: pagina {index}/{total}")
         pixmap = page.get_pixmap(dpi=dpi)
         result, _elapsed = ocr(pixmap.tobytes("png"))
-        if not result:
-            continue
-        lines.extend(_group_ocr_rows(result))
+        if result:
+            lines.extend(_group_ocr_rows(result))
+        if on_progress is not None:
+            on_progress(index, total, f"OCR carta: pagina {index}/{total}")
 
     return lines
 

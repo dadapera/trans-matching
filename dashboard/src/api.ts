@@ -37,7 +37,11 @@ export async function fetchUploadStatus(): Promise<UploadStatus> {
 }
 
 /** Upload files, then poll until OCR/parsing finishes (can take minutes for PDFs). */
-export async function uploadFiles(carta: File, gestionale: File): Promise<UploadResponse> {
+export async function uploadFiles(
+  carta: File,
+  gestionale: File,
+  onProgress?: (status: UploadStatus) => void,
+): Promise<UploadResponse> {
   const form = new FormData();
   form.append("carta", carta);
   form.append("gestionale", gestionale);
@@ -46,8 +50,9 @@ export async function uploadFiles(carta: File, gestionale: File): Promise<Upload
   const started = Date.now();
   const maxMs = 15 * 60 * 1000;
   while (Date.now() - started < maxMs) {
-    await sleep(2000);
+    await sleep(1000);
     const status = await fetchUploadStatus();
+    onProgress?.(status);
     if (status.status === "ready") {
       return {
         carta_count: status.carta_count,

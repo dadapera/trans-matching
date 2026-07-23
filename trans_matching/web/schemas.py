@@ -60,6 +60,10 @@ class UploadStatusResponse(BaseModel):
     carta_filename: str = ""
     gestionale_filename: str = ""
     error: str | None = None
+    progress_current: int = 0
+    progress_total: int = 0
+    progress_message: str = ""
+    progress_pct: float = 0.0
 
 
 class UploadResponse(BaseModel):

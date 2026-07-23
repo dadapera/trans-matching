@@ -53,20 +53,28 @@ _PAGE_BREAK = re.compile(
 )
 
 
-def parse_amex_file(path: Path) -> list[Transaction]:
+def parse_amex_file(
+    path: Path,
+    *,
+    on_progress=None,
+) -> list[Transaction]:
     suffix = path.suffix.lower()
     if suffix == ".csv":
         return parse_amex_csv(path)
     if suffix == ".pdf":
-        return parse_amex_pdf(path)
+        return parse_amex_pdf(path, on_progress=on_progress)
     raise ValueError(f"Formato carta non supportato: {path.name}")
 
 
-def parse_amex_pdf(path: Path) -> list[Transaction]:
+def parse_amex_pdf(path: Path, *, on_progress=None) -> list[Transaction]:
     if pdf_has_text_layer(path):
+        if on_progress is not None:
+            on_progress(0, 1, "Lettura testo PDF carta…")
         lines = extract_pdf_text(path).splitlines()
+        if on_progress is not None:
+            on_progress(1, 1, "Testo PDF carta estratto")
     else:
-        lines = extract_pdf_lines_ocr(path)
+        lines = extract_pdf_lines_ocr(path, on_progress=on_progress)
     return parse_amex_pdf_lines(lines, source=str(path))
 
 

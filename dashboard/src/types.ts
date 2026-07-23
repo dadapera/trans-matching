@@ -40,6 +40,10 @@ export interface UploadStatus {
   carta_filename: string;
   gestionale_filename: string;
   error?: string | null;
+  progress_current?: number;
+  progress_total?: number;
+  progress_message?: string;
+  progress_pct?: number;
 }
 
 export interface SessionInfo {

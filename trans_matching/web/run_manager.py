@@ -48,6 +48,9 @@ class UploadJob:
     carta_count: int = 0
     gestionale_count: int = 0
     error: str | None = None
+    progress_current: int = 0
+    progress_total: int = 0
+    progress_message: str = ""
     thread: threading.Thread | None = None
 
 
@@ -90,6 +93,9 @@ class RunManager:
                 gestionale_filename=gestionale_filename,
                 carta_count=len(card_transactions),
                 gestionale_count=len(gestionale_transactions),
+                progress_current=1,
+                progress_total=1,
+                progress_message="Completato",
             )
         return session
 
@@ -101,9 +107,22 @@ class RunManager:
         with self._lock:
             return self._upload_job.status == "processing"
 
+    def set_upload_progress(self, current: int, total: int, message: str) -> None:
+        with self._lock:
+            if self._upload_job.status != "processing":
+                return
+            self._upload_job.progress_current = current
+            self._upload_job.progress_total = total
+            self._upload_job.progress_message = message
+
     def get_upload_status(self) -> dict[str, Any]:
         with self._lock:
             job = self._upload_job
+            progress_pct = 0.0
+            if job.status == "ready":
+                progress_pct = 100.0
+            elif job.progress_total > 0:
+                progress_pct = min(100.0, 100.0 * job.progress_current / job.progress_total)
             return {
                 "status": job.status,
                 "carta_count": job.carta_count,
@@ -111,6 +130,10 @@ class RunManager:
                 "carta_filename": job.carta_filename,
                 "gestionale_filename": job.gestionale_filename,
                 "error": job.error,
+                "progress_current": job.progress_current,
+                "progress_total": job.progress_total,
+                "progress_message": job.progress_message,
+                "progress_pct": progress_pct,
             }
 
     def start_upload_parse(
@@ -142,7 +165,9 @@ class RunManager:
         def worker() -> None:
             try:
                 card_txns, gestionale_txns = parse_carta_and_gestionale(
-                    carta_path, gestionale_path
+                    carta_path,
+                    gestionale_path,
+                    on_progress=self.set_upload_progress,
                 )
                 self.set_upload(
                     card_txns,

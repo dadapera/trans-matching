@@ -92,6 +92,8 @@ export function UploadPanel({
   const [gestionaleFile, setGestionaleFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [progressPct, setProgressPct] = useState(0);
+  const [progressMessage, setProgressMessage] = useState("");
 
   const handleUpload = async () => {
     if (!cartaFile || !gestionaleFile) {
@@ -100,9 +102,16 @@ export function UploadPanel({
     }
     setLoading(true);
     setError(null);
+    setProgressPct(0);
+    setProgressMessage("Upload in corso…");
     try {
       const { uploadFiles } = await import("../api");
-      const res = await uploadFiles(cartaFile, gestionaleFile);
+      const res = await uploadFiles(cartaFile, gestionaleFile, (status) => {
+        setProgressPct(status.progress_pct ?? 0);
+        setProgressMessage(status.progress_message || "OCR / parsing in corso…");
+      });
+      setProgressPct(100);
+      setProgressMessage("Completato");
       onUploaded(res);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload fallito");
@@ -141,9 +150,18 @@ export function UploadPanel({
         </button>
       )}
       {loading && (
-        <p className="dropzone__hint">
-          Il PDF Amex richiede OCR: può richiedere alcuni minuti. Non chiudere la pagina.
-        </p>
+        <div className="progress-block">
+          <div className="progress-meta">
+            <span>{progressMessage || "OCR / parsing in corso…"}</span>
+            <span>{Math.round(progressPct)}%</span>
+          </div>
+          <div className="progress-bar">
+            <div className="progress-bar__fill" style={{ width: `${progressPct}%` }} />
+          </div>
+          <p className="dropzone__hint">
+            Il PDF Amex richiede OCR: può richiedere alcuni minuti. Non chiudere la pagina.
+          </p>
+        </div>
       )}
       {error && <p className="error-text">{error}</p>}
     </section>
