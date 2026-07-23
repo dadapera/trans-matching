@@ -15,6 +15,7 @@ from trans_matching.matchers.agent_models import AgentMatchResult, Confidence, M
 from trans_matching.matchers.gestionale_text import normalize_text
 from trans_matching.parsers.gestionale import format_siap_match_label
 from trans_matching.models import Transaction
+from trans_matching.email.models import EmailSearchQuery
 from trans_matching.verifiers.expedia_parser import format_llm_email_text, parse_expedia_email
 from trans_matching.verifiers.expedia_trvl import (
     EXPEDIA_SENDER,
@@ -219,7 +220,10 @@ def search_msc(search_date: str = "") -> str:
 
 
 def collect_msc_context(session, search_date: str = "") -> dict:
-    """Raccoglie cognomi passeggeri dagli allegati booking MSC."""
+    """Raccoglie cognomi passeggeri dagli allegati booking MSC.
+
+    Scarica/parsa una email alla volta e scarta allegati subito: evita OOM su 512MB.
+    """
     started = time.perf_counter()
     config = get_msc_email_config()
     target_date = search_date.strip() or session.card.date
@@ -230,69 +234,72 @@ def collect_msc_context(session, search_date: str = "") -> dict:
         _log_tool(session, "msc_context", payload, started)
         return payload
 
-    collected: list[dict] = []
+    surnames: set[str] = set()
+    emails_scanned = 0
+    stopped_early = False
     for from_address in config.from_addresses:
-        emails = session.reader.search_by_sender_date_range(
+        query = EmailSearchQuery(
             from_address=from_address,
             since=window_start.date(),
             before=(window_end + timedelta(days=1)).date(),
             include_body=True,
+            include_attachments=True,
             max_results=config.max_results,
             max_body_bytes=config.max_body_bytes,
-            include_attachments=True,
         )
-        session.logger.log(
-            "email_search",
-            trace_id=session.trace_id,
-            provider="msc",
-            from_address=from_address,
-            search_date=target_date,
-            date_from=window_start.date().isoformat(),
-            date_to=window_end.date().isoformat(),
-            results=len(emails),
-        )
-        for mail in emails:
+
+        def _log_uids(count: int, *, _from=from_address) -> None:
+            session.logger.log(
+                "email_search",
+                trace_id=session.trace_id,
+                provider="msc",
+                from_address=_from,
+                search_date=target_date,
+                date_from=window_start.date().isoformat(),
+                date_to=window_end.date().isoformat(),
+                results=count,
+            )
+
+        for mail in session.reader.iter_search(query, on_uids=_log_uids):
+            emails_scanned += 1
             parsed = parse_msc_email(
                 mail.body,
                 mail.html_body,
                 subject=mail.subject,
                 attachments=mail.attachments,
             )
-            collected.append(
-                {
-                    "from": from_address,
-                    "subject": mail.subject,
-                    "date": mail.date,
-                    "uid": mail.uid,
-                    "parsed": parsed,
-                }
-            )
+            for surname in parsed.get("passenger_surnames", []):
+                if isinstance(surname, str) and surname:
+                    surnames.add(surname)
+            # Drop heavy fields before next IMAP fetch.
+            del mail
+            # ponytail: early-stop after first booking PDF with surnames; ceiling =
+            # other MSC emails in the same ±7d window are skipped. Re-scan all if needed.
+            if surnames:
+                stopped_early = True
+                break
+        if stopped_early:
+            break
 
-    surnames = sorted(
-        {
-            surname
-            for item in collected
-            for surname in item["parsed"].get("passenger_surnames", [])
-            if isinstance(surname, str) and surname
-        }
-    )
+    sorted_surnames = sorted(surnames)
     payload = {
-        "status": "passengers_found" if surnames else "no_passengers",
+        "status": "passengers_found" if sorted_surnames else "no_passengers",
         "search_date": target_date,
         "date_window_days": _MSC_EMAIL_WINDOW_DAYS,
         "max_results_per_sender": config.max_results,
         "max_body_bytes": config.max_body_bytes,
-        "emails_scanned": len(collected),
-        "passenger_surnames": surnames,
-        "emails": collected,
+        "emails_scanned": emails_scanned,
+        "stopped_early": stopped_early,
+        "passenger_surnames": sorted_surnames,
     }
     _log_tool(
         session,
         "msc_context",
         {
             "status": payload["status"],
-            "emails": len(collected),
-            "passenger_surnames": surnames,
+            "emails": emails_scanned,
+            "passenger_surnames": sorted_surnames,
+            "stopped_early": stopped_early,
         },
         started,
     )

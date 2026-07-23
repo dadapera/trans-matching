@@ -123,16 +123,16 @@ def get_msc_email_config() -> MscEmailConfig:
         part.strip() for part in raw_from.split(",") if part.strip()
     ) or ("msc-booking.no-reply@msccrociere.it",)
     try:
-        max_results = int(os.getenv("MSC_EMAIL_MAX_RESULTS", "20"))
+        max_results = int(os.getenv("MSC_EMAIL_MAX_RESULTS", "5"))
     except ValueError:
-        max_results = 20
+        max_results = 5
     try:
         max_body_bytes = int(os.getenv("MSC_EMAIL_MAX_BODY_BYTES", "65536"))
     except ValueError:
         max_body_bytes = 65536
     return MscEmailConfig(
         from_addresses=addresses,
-        max_results=max(1, min(max_results, 100)),
+        max_results=max(1, min(max_results, 20)),
         max_body_bytes=max(4096, min(max_body_bytes, 1_048_576)),
     )
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import email
 import imaplib
 import ssl
+from collections.abc import Callable, Iterator
 from datetime import date
 from email.header import decode_header
 from email.message import Message
@@ -198,38 +199,52 @@ class GmailReader:
                 raise RuntimeError(_imap_auth_error_message(retry_exc, self._config)) from retry_exc
 
     def search(self, query: EmailSearchQuery) -> list[EmailMessage]:
-        def _search(mail: imaplib.IMAP4_SSL) -> list[EmailMessage]:
+        return list(self.iter_search(query))
+
+    def iter_search(
+        self,
+        query: EmailSearchQuery,
+        *,
+        on_uids: Callable[[int], None] | None = None,
+    ) -> Iterator[EmailMessage]:
+        """Yield messages one-by-one so callers can discard each before the next fetch."""
+
+        def _list_uids(mail: imaplib.IMAP4_SSL) -> list[bytes]:
             status, data = mail.uid("search", None, query.to_imap_criteria())
             if status != "OK" or not data or not data[0]:
                 return []
-
             uids = data[0].split()
             if query.max_results is not None:
                 uids = [] if query.max_results <= 0 else uids[-query.max_results:]
+            return uids
 
-            results: list[EmailMessage] = []
-            for uid in uids:
-                fetch_query = _fetch_query(query)
+        uids = self._run_imap(_list_uids)
+        if on_uids is not None:
+            on_uids(len(uids))
+
+        fetch_query = _fetch_query(query)
+        for uid in uids:
+            def _fetch(mail: imaplib.IMAP4_SSL, uid=uid) -> EmailMessage | None:
                 try:
                     status, fetched = mail.uid("fetch", uid, fetch_query)
                 except (TimeoutError, OSError):
                     self.disconnect()
-                    break
+                    return None
                 if status != "OK" or not fetched or not fetched[0]:
-                    continue
+                    return None
                 raw = fetched[0][1]
-                if isinstance(raw, bytes):
-                    results.append(
-                        _parse_message(
-                            uid,
-                            raw,
-                            include_body=query.include_body,
-                            include_attachments=query.include_attachments,
-                        )
-                    )
-            return results
+                if not isinstance(raw, bytes):
+                    return None
+                return _parse_message(
+                    uid,
+                    raw,
+                    include_body=query.include_body,
+                    include_attachments=query.include_attachments,
+                )
 
-        return self._run_imap(_search)
+            message = self._run_imap(_fetch)
+            if message is not None:
+                yield message
 
     def search_by_text(
         self,

@@ -21,5 +21,15 @@ def test_msc_email_config_limits_results(monkeypatch) -> None:
     config = get_msc_email_config()
 
     assert config.from_addresses == ("a@example.com", "b@example.com")
-    assert config.max_results == 100
+    assert config.max_results == 20
     assert config.max_body_bytes == 4096
+
+
+def test_msc_email_config_default_max_results(monkeypatch) -> None:
+    monkeypatch.delenv("MSC_EMAIL_MAX_RESULTS", raising=False)
+    monkeypatch.delenv("MSC_EMAIL_FROM", raising=False)
+    monkeypatch.delenv("MSC_EMAIL_MAX_BODY_BYTES", raising=False)
+
+    config = get_msc_email_config()
+
+    assert config.max_results == 5
