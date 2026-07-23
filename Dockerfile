@@ -17,6 +17,17 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     AGENT_LOG_DIR=/data/logs \
     PORT=8000
 
+# OpenCV (via rapidocr-onnxruntime) needs these shared libs even headless.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        libgl1 \
+        libglib2.0-0 \
+        libsm6 \
+        libxext6 \
+        libxrender1 \
+        libxcb1 \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
