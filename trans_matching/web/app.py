@@ -16,9 +16,10 @@ from trans_matching.web.schemas import (
     RunStartRequest,
     RunStartResponse,
     RunStatusDTO,
-    UploadResponse,
+    UploadAcceptedResponse,
+    UploadStatusResponse,
 )
-from trans_matching.web.upload import parse_upload_files
+from trans_matching.web.upload import read_upload_bytes
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 DASHBOARD_DIST = ROOT / "dashboard" / "dist"
@@ -34,23 +35,38 @@ app.add_middleware(
 )
 
 
-@app.post("/api/session/upload", response_model=UploadResponse)
+@app.post("/api/session/upload", response_model=UploadAcceptedResponse)
 async def upload_session(
     carta: UploadFile = File(...),
     gestionale: UploadFile = File(...),
-) -> UploadResponse:
+) -> UploadAcceptedResponse:
     if run_manager.is_running():
-        raise HTTPException(status_code=409, detail="Analisi in corso: attendi o fermala prima di ricaricare")
-    card_txns, gestionale_txns, carta_name, gestionale_name = await parse_upload_files(
+        raise HTTPException(
+            status_code=409,
+            detail="Analisi in corso: attendi o fermala prima di ricaricare",
+        )
+    if run_manager.is_upload_processing():
+        raise HTTPException(status_code=409, detail="Upload già in elaborazione")
+
+    carta_bytes, gestionale_bytes, carta_name, gestionale_name = await read_upload_bytes(
         carta, gestionale
     )
-    run_manager.set_upload(card_txns, gestionale_txns, carta_name, gestionale_name)
-    return UploadResponse(
-        carta_count=len(card_txns),
-        gestionale_count=len(gestionale_txns),
+    try:
+        run_manager.start_upload_parse(
+            carta_bytes, gestionale_bytes, carta_name, gestionale_name
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    return UploadAcceptedResponse(
         carta_filename=carta_name,
         gestionale_filename=gestionale_name,
     )
+
+
+@app.get("/api/session/upload", response_model=UploadStatusResponse)
+async def upload_status() -> UploadStatusResponse:
+    return UploadStatusResponse(**run_manager.get_upload_status())
 
 
 @app.post("/api/runs", response_model=RunStartResponse)
@@ -165,11 +181,18 @@ async def verify_gmail() -> dict[str, str]:
 @app.get("/api/session")
 async def get_session() -> dict:
     upload = run_manager.get_upload()
+    upload_status = run_manager.get_upload_status()
     active_id = run_manager.get_active_run_id()
     if upload is None:
-        return {"ready": False, "active_run_id": active_id}
+        return {
+            "ready": False,
+            "upload_status": upload_status["status"],
+            "upload_error": upload_status.get("error"),
+            "active_run_id": active_id,
+        }
     return {
         "ready": True,
+        "upload_status": "ready",
         "carta_count": len(upload.card_transactions),
         "gestionale_count": len(upload.gestionale_transactions),
         "carta_filename": upload.carta_filename,

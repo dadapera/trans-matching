@@ -33,8 +33,19 @@ export interface UploadResponse {
   gestionale_filename: string;
 }
 
+export interface UploadStatus {
+  status: "idle" | "processing" | "ready" | "error";
+  carta_count: number;
+  gestionale_count: number;
+  carta_filename: string;
+  gestionale_filename: string;
+  error?: string | null;
+}
+
 export interface SessionInfo {
   ready: boolean;
+  upload_status?: UploadStatus["status"];
+  upload_error?: string | null;
   carta_count?: number;
   gestionale_count?: number;
   carta_filename?: string;

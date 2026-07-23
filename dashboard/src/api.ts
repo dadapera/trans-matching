@@ -5,6 +5,7 @@ import type {
   RunStatus,
   SessionInfo,
   UploadResponse,
+  UploadStatus,
 } from "./types";
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
@@ -23,15 +24,43 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export async function fetchSession(): Promise<SessionInfo> {
   return request<SessionInfo>("/api/session");
 }
 
+export async function fetchUploadStatus(): Promise<UploadStatus> {
+  return request<UploadStatus>("/api/session/upload");
+}
+
+/** Upload files, then poll until OCR/parsing finishes (can take minutes for PDFs). */
 export async function uploadFiles(carta: File, gestionale: File): Promise<UploadResponse> {
   const form = new FormData();
   form.append("carta", carta);
   form.append("gestionale", gestionale);
-  return request<UploadResponse>("/api/session/upload", { method: "POST", body: form });
+  await request<{ status: string }>("/api/session/upload", { method: "POST", body: form });
+
+  const started = Date.now();
+  const maxMs = 15 * 60 * 1000;
+  while (Date.now() - started < maxMs) {
+    await sleep(2000);
+    const status = await fetchUploadStatus();
+    if (status.status === "ready") {
+      return {
+        carta_count: status.carta_count,
+        gestionale_count: status.gestionale_count,
+        carta_filename: status.carta_filename,
+        gestionale_filename: status.gestionale_filename,
+      };
+    }
+    if (status.status === "error") {
+      throw new Error(status.error || "Errore durante l'OCR/parsing");
+    }
+  }
+  throw new Error("Timeout OCR/parsing: riprova o usa un CSV");
 }
 
 export async function startRun(options: RunStartRequest): Promise<{ run_id: number }> {

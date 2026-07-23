@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import json
 import queue
+import shutil
+import tempfile
 import threading
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Any
+from pathlib import Path
+from typing import Any, Literal
 
 from trans_matching.agent.logging import create_run_logger
 from trans_matching.agent.pipeline import run_agent_matching
@@ -23,6 +26,7 @@ from trans_matching.storage.agent_repository import (
     update_agent_run,
 )
 from trans_matching.web.schemas import match_result_to_dto
+from trans_matching.web.upload import parse_carta_and_gestionale
 
 
 @dataclass
@@ -31,6 +35,20 @@ class UploadSession:
     gestionale_transactions: list[Transaction]
     carta_filename: str
     gestionale_filename: str
+
+
+UploadJobStatus = Literal["idle", "processing", "ready", "error"]
+
+
+@dataclass
+class UploadJob:
+    status: UploadJobStatus = "idle"
+    carta_filename: str = ""
+    gestionale_filename: str = ""
+    carta_count: int = 0
+    gestionale_count: int = 0
+    error: str | None = None
+    thread: threading.Thread | None = None
 
 
 @dataclass
@@ -47,6 +65,7 @@ class RunManager:
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._upload: UploadSession | None = None
+        self._upload_job = UploadJob()
         self._active: ActiveRun | None = None
         self._subscribers: dict[int, list[queue.Queue[str]]] = defaultdict(list)
 
@@ -65,11 +84,88 @@ class RunManager:
         )
         with self._lock:
             self._upload = session
+            self._upload_job = UploadJob(
+                status="ready",
+                carta_filename=carta_filename,
+                gestionale_filename=gestionale_filename,
+                carta_count=len(card_transactions),
+                gestionale_count=len(gestionale_transactions),
+            )
         return session
 
     def get_upload(self) -> UploadSession | None:
         with self._lock:
             return self._upload
+
+    def is_upload_processing(self) -> bool:
+        with self._lock:
+            return self._upload_job.status == "processing"
+
+    def get_upload_status(self) -> dict[str, Any]:
+        with self._lock:
+            job = self._upload_job
+            return {
+                "status": job.status,
+                "carta_count": job.carta_count,
+                "gestionale_count": job.gestionale_count,
+                "carta_filename": job.carta_filename,
+                "gestionale_filename": job.gestionale_filename,
+                "error": job.error,
+            }
+
+    def start_upload_parse(
+        self,
+        carta_bytes: bytes,
+        gestionale_bytes: bytes,
+        carta_filename: str,
+        gestionale_filename: str,
+    ) -> None:
+        with self._lock:
+            if self._active is not None and self._active.status == "running":
+                raise RuntimeError("Analisi in corso: attendi o fermala prima di ricaricare")
+            if self._upload_job.status == "processing":
+                raise RuntimeError("Upload già in elaborazione")
+
+            self._upload = None
+            self._upload_job = UploadJob(
+                status="processing",
+                carta_filename=carta_filename,
+                gestionale_filename=gestionale_filename,
+            )
+
+        tmp_dir = Path(tempfile.mkdtemp(prefix="trans-matching-upload-"))
+        carta_path = tmp_dir / f"carta{Path(carta_filename).suffix.lower()}"
+        gestionale_path = tmp_dir / "gestionale.pdf"
+        carta_path.write_bytes(carta_bytes)
+        gestionale_path.write_bytes(gestionale_bytes)
+
+        def worker() -> None:
+            try:
+                card_txns, gestionale_txns = parse_carta_and_gestionale(
+                    carta_path, gestionale_path
+                )
+                self.set_upload(
+                    card_txns,
+                    gestionale_txns,
+                    carta_filename,
+                    gestionale_filename,
+                )
+            except Exception as exc:
+                with self._lock:
+                    self._upload = None
+                    self._upload_job = UploadJob(
+                        status="error",
+                        carta_filename=carta_filename,
+                        gestionale_filename=gestionale_filename,
+                        error=str(exc),
+                    )
+            finally:
+                shutil.rmtree(tmp_dir, ignore_errors=True)
+
+        thread = threading.Thread(target=worker, name="upload-parse", daemon=True)
+        with self._lock:
+            self._upload_job.thread = thread
+        thread.start()
 
     def is_running(self) -> bool:
         with self._lock:
@@ -85,6 +181,8 @@ class RunManager:
         with self._lock:
             if self._active is not None and self._active.status == "running":
                 raise RuntimeError("Una analisi è già in corso")
+            if self._upload_job.status == "processing":
+                raise RuntimeError("Attendere il completamento dell'OCR/upload")
             if self._upload is None:
                 raise RuntimeError("Carica prima i file carta e gestionale")
 

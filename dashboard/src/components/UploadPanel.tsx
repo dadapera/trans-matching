@@ -137,8 +137,13 @@ export function UploadPanel({
           disabled={disabled || loading || !cartaFile || !gestionaleFile}
           onClick={handleUpload}
         >
-          {loading ? "Caricamento…" : "Conferma upload"}
+          {loading ? "OCR / parsing in corso…" : "Conferma upload"}
         </button>
+      )}
+      {loading && (
+        <p className="dropzone__hint">
+          Il PDF Amex richiede OCR: può richiedere alcuni minuti. Non chiudere la pagina.
+        </p>
       )}
       {error && <p className="error-text">{error}</p>}
     </section>

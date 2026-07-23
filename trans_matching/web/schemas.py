@@ -47,7 +47,24 @@ class AgentEventDTO(BaseModel):
     payload: dict[str, Any] = Field(default_factory=dict)
 
 
+class UploadAcceptedResponse(BaseModel):
+    status: Literal["processing"] = "processing"
+    carta_filename: str
+    gestionale_filename: str
+
+
+class UploadStatusResponse(BaseModel):
+    status: Literal["idle", "processing", "ready", "error"]
+    carta_count: int = 0
+    gestionale_count: int = 0
+    carta_filename: str = ""
+    gestionale_filename: str = ""
+    error: str | None = None
+
+
 class UploadResponse(BaseModel):
+    """Final upload payload once parsing is ready (frontend convenience)."""
+
     carta_count: int
     gestionale_count: int
     carta_filename: str
