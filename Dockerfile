@@ -15,7 +15,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH=/app \
     DATA_DIR=/data \
     AGENT_LOG_DIR=/data/logs \
-    PORT=8000
+    PORT=8000 \
+    OMP_NUM_THREADS=1 \
+    OPENBLAS_NUM_THREADS=1 \
+    MKL_NUM_THREADS=1 \
+    ORT_INTRA_OP_NUM_THREADS=1 \
+    ORT_INTER_OP_NUM_THREADS=1
 
 # OpenCV (via rapidocr-onnxruntime) needs these shared libs even headless.
 RUN apt-get update \

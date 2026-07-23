@@ -8,24 +8,45 @@ import type {
   UploadStatus,
 } from "./types";
 
+function humanizeErrorBody(status: number, body: string): string {
+  const trimmed = body.trim();
+  if (trimmed.startsWith("<!DOCTYPE") || trimmed.startsWith("<html")) {
+    if (status === 502 || status === 503 || status === 504) {
+      return `Server temporaneamente non disponibile (${status}). Riprova tra poco.`;
+    }
+    return `Errore server (${status})`;
+  }
+  try {
+    const json = JSON.parse(trimmed);
+    const detail = json.detail ?? trimmed;
+    return typeof detail === "string" ? detail : JSON.stringify(detail);
+  } catch {
+    return trimmed || `Errore HTTP ${status}`;
+  }
+}
+
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, init);
   if (!res.ok) {
     const body = await res.text();
-    let detail = body;
-    try {
-      const json = JSON.parse(body);
-      detail = json.detail ?? body;
-    } catch {
-      /* use raw body */
-    }
-    throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+    throw new Error(humanizeErrorBody(res.status, body));
   }
   return res.json() as Promise<T>;
 }
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isTransientNetworkError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const msg = err.message.toLowerCase();
+  return (
+    msg.includes("temporaneamente non disponibile") ||
+    msg.includes("failed to fetch") ||
+    msg.includes("networkerror") ||
+    msg.includes("load failed")
+  );
 }
 
 export async function fetchSession(): Promise<SessionInfo> {
@@ -49,10 +70,38 @@ export async function uploadFiles(
 
   const started = Date.now();
   const maxMs = 15 * 60 * 1000;
+  let sawProcessing = false;
+  let transientFails = 0;
+
   while (Date.now() - started < maxMs) {
     await sleep(1000);
-    const status = await fetchUploadStatus();
+    let status: UploadStatus;
+    try {
+      status = await fetchUploadStatus();
+      transientFails = 0;
+    } catch (err) {
+      // Instance restarts mid-OCR briefly return 502; keep polling a bit.
+      if (isTransientNetworkError(err) && transientFails < 30) {
+        transientFails += 1;
+        onProgress?.({
+          status: "processing",
+          carta_count: 0,
+          gestionale_count: 0,
+          carta_filename: "",
+          gestionale_filename: "",
+          progress_message: "Server in ripresa, riprovo…",
+          progress_pct: 0,
+        });
+        continue;
+      }
+      throw err;
+    }
+
+    if (status.status === "processing") {
+      sawProcessing = true;
+    }
     onProgress?.(status);
+
     if (status.status === "ready") {
       return {
         carta_count: status.carta_count,
@@ -63,6 +112,11 @@ export async function uploadFiles(
     }
     if (status.status === "error") {
       throw new Error(status.error || "Errore durante l'OCR/parsing");
+    }
+    if (status.status === "idle" && sawProcessing) {
+      throw new Error(
+        "Il server si è riavviato durante l'OCR (memoria insufficiente). Riprova o carica un CSV Amex.",
+      );
     }
   }
   throw new Error("Timeout OCR/parsing: riprova o usa un CSV");

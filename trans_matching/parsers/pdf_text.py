@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import gc
 import statistics
 from collections import defaultdict
 from collections.abc import Callable
@@ -8,6 +9,9 @@ from pathlib import Path
 from pypdf import PdfReader
 
 ProgressCallback = Callable[[int, int, str], None]
+
+# Keep OCR lean on Render starter (512MB). Higher DPI blows memory with ONNX + pixmap.
+_DEFAULT_OCR_DPI = 110
 
 
 def extract_pdf_text(path: Path) -> str:
@@ -33,27 +37,55 @@ def pdf_page_count(path: Path) -> int:
 def extract_pdf_lines_ocr(
     path: Path,
     *,
-    dpi: int = 180,
+    dpi: int = _DEFAULT_OCR_DPI,
     on_progress: ProgressCallback | None = None,
 ) -> list[str]:
     """OCR per PDF senza text layer (es. estratti Amex stampati in PDF)."""
     import fitz
+    import numpy as np
     from rapidocr_onnxruntime import RapidOCR
 
-    ocr = RapidOCR()
+    # Angle classifier adds another ONNX model; skip to reduce peak RAM.
+    try:
+        ocr = RapidOCR(params={"Global.use_angle_cls": False})
+    except TypeError:
+        ocr = RapidOCR()
     doc = fitz.open(str(path))
     lines: list[str] = []
     total = len(doc)
 
-    for index, page in enumerate(doc, start=1):
-        if on_progress is not None:
-            on_progress(index - 1, total, f"OCR carta: pagina {index}/{total}")
-        pixmap = page.get_pixmap(dpi=dpi)
-        result, _elapsed = ocr(pixmap.tobytes("png"))
-        if result:
-            lines.extend(_group_ocr_rows(result))
-        if on_progress is not None:
-            on_progress(index, total, f"OCR carta: pagina {index}/{total}")
+    try:
+        for index in range(total):
+            page_num = index + 1
+            if on_progress is not None:
+                on_progress(index, total, f"OCR carta: pagina {page_num}/{total}")
+
+            page = doc.load_page(index)
+            pixmap = page.get_pixmap(dpi=dpi, alpha=False)
+            try:
+                image = np.frombuffer(pixmap.samples, dtype=np.uint8).reshape(
+                    pixmap.height, pixmap.width, pixmap.n
+                )
+                # Copy so RapidOCR does not keep a view into the pixmap buffer.
+                try:
+                    result, _elapsed = ocr(image.copy(), use_cls=False)
+                except TypeError:
+                    result, _elapsed = ocr(image.copy())
+            finally:
+                del pixmap
+
+            if result:
+                lines.extend(_group_ocr_rows(result))
+
+            if on_progress is not None:
+                on_progress(page_num, total, f"OCR carta: pagina {page_num}/{total}")
+
+            # Peak RAM is model + one page; force reclaim between pages.
+            gc.collect()
+    finally:
+        doc.close()
+        del ocr
+        gc.collect()
 
     return lines
 
