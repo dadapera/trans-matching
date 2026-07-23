@@ -10,8 +10,10 @@ from pypdf import PdfReader
 
 ProgressCallback = Callable[[int, int, str], None]
 
-# Keep OCR lean on Render starter (512MB). Higher DPI blows memory with ONNX + pixmap.
-_DEFAULT_OCR_DPI = 110
+# Keep OCR lean on Render starter (512MB). Det tensors and pixmaps dominate peak RAM.
+_DEFAULT_OCR_DPI = 96
+_OCR_MAX_SIDE_LEN = 960
+_OCR_DET_LIMIT_SIDE_LEN = 640
 
 
 def extract_pdf_text(path: Path) -> str:
@@ -43,13 +45,15 @@ def extract_pdf_lines_ocr(
     """OCR per PDF senza text layer (es. estratti Amex stampati in PDF)."""
     import fitz
     import numpy as np
-    from rapidocr_onnxruntime import RapidOCR
 
-    # Angle classifier adds another ONNX model; skip to reduce peak RAM.
     try:
-        ocr = RapidOCR(params={"Global.use_angle_cls": False})
-    except TypeError:
-        ocr = RapidOCR()
+        import cv2
+
+        cv2.setNumThreads(1)
+    except Exception:
+        pass
+
+    ocr = _build_lean_ocr()
     doc = fitz.open(str(path))
     lines: list[str] = []
     total = len(doc)
@@ -61,18 +65,21 @@ def extract_pdf_lines_ocr(
                 on_progress(index, total, f"OCR carta: pagina {page_num}/{total}")
 
             page = doc.load_page(index)
-            pixmap = page.get_pixmap(dpi=dpi, alpha=False)
+            # Grayscale pixmap is 1/3 the RAM of RGB before LoadImage expands to BGR.
+            pixmap = page.get_pixmap(dpi=dpi, colorspace=fitz.csGRAY, alpha=False)
             try:
                 image = np.frombuffer(pixmap.samples, dtype=np.uint8).reshape(
-                    pixmap.height, pixmap.width, pixmap.n
-                )
-                # Copy so RapidOCR does not keep a view into the pixmap buffer.
-                try:
-                    result, _elapsed = ocr(image.copy(), use_cls=False)
-                except TypeError:
-                    result, _elapsed = ocr(image.copy())
+                    pixmap.height, pixmap.width
+                ).copy()
             finally:
                 del pixmap
+
+            try:
+                result, _elapsed = ocr(image, use_cls=False)
+            except TypeError:
+                result, _elapsed = ocr(image)
+            finally:
+                del image
 
             if result:
                 lines.extend(_group_ocr_rows(result))
@@ -80,14 +87,76 @@ def extract_pdf_lines_ocr(
             if on_progress is not None:
                 on_progress(page_num, total, f"OCR carta: pagina {page_num}/{total}")
 
-            # Peak RAM is model + one page; force reclaim between pages.
             gc.collect()
     finally:
         doc.close()
-        del ocr
+        _release_ocr(ocr)
         gc.collect()
 
     return lines
+
+
+def _build_lean_ocr():
+    """Build RapidOCR with settings that keep peak RAM low on 512MB instances."""
+    from rapidocr_onnxruntime import RapidOCR
+
+    # RapidOCR takes flat kwargs (not nested YAML paths). The previous
+    # params={"Global.use_angle_cls": False} was ignored.
+    ocr = RapidOCR(
+        use_cls=False,
+        print_verbose=False,
+        intra_op_num_threads=1,
+        inter_op_num_threads=1,
+        max_side_len=_OCR_MAX_SIDE_LEN,
+        det_limit_side_len=_OCR_DET_LIMIT_SIDE_LEN,
+        det_limit_type="max",
+        rec_batch_num=1,
+        cls_batch_num=1,
+    )
+    _unload_text_classifier(ocr)
+    return ocr
+
+
+def _unload_text_classifier(ocr) -> None:
+    """RapidOCR always constructs TextClassifier; drop its ORT session when unused."""
+    cls = getattr(ocr, "text_cls", None)
+    if cls is None:
+        return
+    infer = getattr(cls, "infer", None)
+    if infer is not None:
+        session = getattr(infer, "session", None)
+        if session is not None:
+            del session
+        cls.infer = None
+        del infer
+    ocr.text_cls = None
+    del cls
+    gc.collect()
+
+
+def _release_ocr(ocr) -> None:
+    det = getattr(ocr, "text_det", None)
+    if det is not None:
+        infer = getattr(det, "infer", None)
+        if infer is not None:
+            if getattr(infer, "session", None) is not None:
+                del infer.session
+            det.infer = None
+        ocr.text_det = None
+
+    _unload_text_classifier(ocr)
+
+    rec = getattr(ocr, "text_rec", None)
+    if rec is not None:
+        # TextRecognizer stores OrtInferSession on .session
+        ort = getattr(rec, "session", None)
+        if ort is not None:
+            if getattr(ort, "session", None) is not None:
+                del ort.session
+            rec.session = None
+        ocr.text_rec = None
+
+    del ocr
 
 
 def _ocr_row_height(result: list) -> int:

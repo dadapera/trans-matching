@@ -9,15 +9,16 @@ services:
   - type: web
     name: trans-matching-dashboard
     runtime: docker
-    plan: free
+    # Amex PDF OCR needs ~1–2GB peak with RapidOCR; 512MB (free/starter) often OOM.
+    # Prefer plan: standard (2GB) if uploading scanned Amex PDFs in production.
+    plan: starter
     region: frankfurt
     branch: main
     autoDeploy: true
     dockerfilePath: ./Dockerfile
     dockerContext: .
     healthCheckPath: /health
-    # Persistenza DB + log (richiede piano a pagamento, es. starter):
-    # plan: starter
+    # Persistenza DB + log (richiede piano a pagamento):
     # disk:
     #   name: trans-matching-data
     #   mountPath: /data
