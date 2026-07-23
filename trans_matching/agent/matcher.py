@@ -56,8 +56,11 @@ _SYSTEM_PROMPT = """Sei un agente contabile che abbina transazioni carta di cred
 Obiettivo: trovare il match più plausibile usando i tool disponibili.
 
 Workflow consigliato:
-1. Se la transazione è Expedia (EG*TRVL) → usa il contesto Expedia deterministico già fornito, poi valuta i candidati gestionale o compare_amount.
-   Le pratiche Expedia possono avere più righe SIAP, storni o importi non identici: usa hotel/ospite/email come evidenza primaria e restituisci più identificativi quando il gruppo è coerente.
+1. Se la transazione è Expedia (EG*TRVL) → il nome ospite/passeggero dall'email è il riferimento PRINCIPALE per la ricerca.
+   Parti dai candidati gestionale del contesto Expedia; hotel e importo sono solo supporti secondari.
+   Decidi TU se i nomi coincidono: nel SIAP possono essere troncati, abbreviati o con ordine nome/cognome invertito — usa il giudizio, non un match letterale.
+   Le pratiche possono avere più righe SIAP, storni o importi non identici: restituisci più identificativi solo se il gruppo ha lo stesso ospite (coerente a tuo giudizio).
+   VIETATO: scegliere una riga SIAP solo perché l'importo è simile se i nomi indicano chiaramente persone diverse. In quel caso lascia identificativi vuoti (confidence basso).
 2. Se è MSC (mscbook.it / MSC Cruises) → il backend estrae i cognomi passeggeri dagli allegati; non cercare match gestionale.
 3. Se l'importo potrebbe essere suddiviso su più righe dello stesso Documento+Codice Cliente → usa check_document_group_sum.
 4. Se resta una somma multi-riga non coperta dal documento → usa check_sum.
@@ -65,11 +68,12 @@ Workflow consigliato:
 6. Prima di concludere con importi diversi → compare_amount.
 
 Regole confidenza:
-- "alto": match univoco e coerente (ospite/fornitore/data/importo).
-- "medio": match probabile con lieve scostamento importo o dati parziali.
-- "basso": incerto, ambiguo, o troppi candidati equivalenti.
+- "alto": match univoco e coerente (ospite/fornitore/data/importo). Per Expedia l'ospite deve essere lo stesso a tuo giudizio (anche se troncato o invertito).
+- "medio": match probabile con lieve scostamento importo o dati parziali. Per Expedia l'ospite deve comunque risultare la stessa persona.
+- "basso": incerto, ambiguo, troppi candidati equivalenti, oppure (Expedia) ospite assente o chiaramente diverso.
 
 Non usare confidence alto/medio se restano alternative equivalenti: elencale in alternatives.
+Per Expedia non usare confidence alto/medio se i nomi indicano persone diverse, anche se l'importo è vicino.
 Se non c'è evidenza sufficiente, lascia identificativi vuoti e confidence basso.
 
 Formati gestionale: identificativo|data|importo|descrizione  [available]
@@ -251,7 +255,10 @@ def _format_user_prompt(
 Contesto Expedia deterministico già raccolto prima dell'LLM:
 {expedia_context}
 
-Usa questo contesto per decidere il match Expedia; i candidati possono includere split/storni della stessa pratica.
+Regola Expedia: il campo guest (nome passeggero) è il criterio primario.
+Valuta tu se i nomi SIAP corrispondono allo stesso ospite (troncature, abbreviazioni, ordine nome/cognome invertito sono accettabili).
+Preferisci gestionale_candidates se coerenti; non abbinare per sola similarità di importo se i nomi indicano persone diverse.
+Split/storni ok solo se lo stesso ospite a tuo giudizio.
 """
     document_group_section = ""
     if document_group_context and document_group_context.get("count", 0) > 0:
