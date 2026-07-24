@@ -118,6 +118,22 @@ def _extract_gestionale_identificativo(raw: str) -> str:
     return " ".join(raw.split()[:3])
 
 
+# SIAP colonna "Low Cost": dopo flag Rim (N/S), es. "N   KC38J4N" o "N   335 260 16".
+_SIAP_LOW_COST = re.compile(r"\s[NS]\s+([A-Z0-9][A-Z0-9 ]{2,24})\s*$", re.IGNORECASE)
+
+
+def extract_siap_low_cost(raw: str) -> str:
+    """Estrae il codice Low Cost dalla riga SIAP (vuoto se assente)."""
+    match = _SIAP_LOW_COST.search(raw.strip())
+    if not match:
+        return ""
+    return normalize_ticket_code(match.group(1))
+
+
+def normalize_ticket_code(value: str) -> str:
+    return re.sub(r"\s+", "", value.upper().strip())
+
+
 def format_siap_match_label(identificativo: str) -> str:
     cleaned = identificativo.strip()
     if not cleaned or "|" in cleaned:

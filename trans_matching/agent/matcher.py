@@ -27,6 +27,7 @@ from trans_matching.openai_http import (
     build_openai_async_http_client,
     build_openai_http_client,
 )
+from trans_matching.parsers.amex import extract_amex_ticket_number
 
 _MATCHING_AGENT = None
 
@@ -62,13 +63,15 @@ Workflow consigliato:
    Le pratiche possono avere più righe SIAP, storni o importi non identici: restituisci più identificativi solo se il gruppo ha lo stesso ospite (coerente a tuo giudizio).
    VIETATO: scegliere una riga SIAP solo perché l'importo è simile se i nomi indicano chiaramente persone diverse. In quel caso lascia identificativi vuoti (confidence basso).
 2. Se è MSC (mscbook.it / MSC Cruises) → il backend estrae i cognomi passeggeri dagli allegati; non cercare match gestionale.
-3. Se l'importo potrebbe essere suddiviso su più righe dello stesso Documento+Codice Cliente → usa check_document_group_sum.
-4. Se resta una somma multi-riga non coperta dal documento → usa check_sum.
-5. Per casi generici → interpreta direttamente le righe gestionale in context, usando codici fornitore e COGNOME/NOME nelle descrizioni SIAP.
-6. Prima di concludere con importi diversi → compare_amount.
+3. Se nei dettagli Amex compare NUM.BIGLIETTO (voli low cost: Ryanair, EasyJet, Wizz, Vueling, …) → confrontalo con il campo LowCost: delle righe SIAP (colonna Low Cost del gestionale).
+   Un codice biglietto uguale (ignorando spazi) è evidenza FORTE di match; preferiscilo a solo importo/data.
+4. Se l'importo potrebbe essere suddiviso su più righe dello stesso Documento+Codice Cliente → usa check_document_group_sum.
+5. Se resta una somma multi-riga non coperta dal documento → usa check_sum.
+6. Per casi generici → interpreta direttamente le righe gestionale in context, usando codici fornitore e COGNOME/NOME nelle descrizioni SIAP.
+7. Prima di concludere con importi diversi → compare_amount.
 
 Regole confidenza:
-- "alto": match univoco e coerente (ospite/fornitore/data/importo). Per Expedia l'ospite deve essere lo stesso a tuo giudizio (anche se troncato o invertito).
+- "alto": match univoco e coerente (ospite/fornitore/data/importo). Per Expedia l'ospite deve essere lo stesso a tuo giudizio (anche se troncato o invertito). Per low cost, NUM.BIGLIETTO = LowCost è sufficiente per alto se non ci sono conflitti.
 - "medio": match probabile con lieve scostamento importo o dati parziali. Per Expedia l'ospite deve comunque risultare la stessa persona.
 - "basso": incerto, ambiguo, troppi candidati equivalenti, oppure (Expedia) ospite assente o chiaramente diverso.
 
@@ -76,7 +79,8 @@ Non usare confidence alto/medio se restano alternative equivalenti: elencale in 
 Per Expedia non usare confidence alto/medio se i nomi indicano persone diverse, anche se l'importo è vicino.
 Se non c'è evidenza sufficiente, lascia identificativi vuoti e confidence basso.
 
-Formati gestionale: identificativo|data|importo|descrizione  [available]
+Formati gestionale: identificativo|data|importo|descrizione|LowCost:CODICE  [available]
+(LowCost è presente solo se valorizzato in SIAP.)
 Puoi riusare la stessa pratica/riga SIAP su più transazioni quando l'evidenza lo giustifica; l'ambiguità sarà evidenziata nel report per revisione umana."""
 
 
@@ -165,11 +169,13 @@ def match_one(session: MatchSession) -> AgentMatchResult:
             )
             return agent_result
         document_group_context = collect_document_group_context(session)
+        low_cost_context = _collect_low_cost_context(session)
         user_prompt = _format_user_prompt(
             session,
             category,
             expedia_context,
             document_group_context,
+            low_cost_context,
         )
 
         callback = AgentTraceCallback()
@@ -255,11 +261,24 @@ def match_one(session: MatchSession) -> AgentMatchResult:
         reset_session(token)
 
 
+def _collect_low_cost_context(session: MatchSession) -> dict | None:
+    ticket = extract_amex_ticket_number(session.card.description)
+    if not ticket:
+        return None
+    hits = session.pool.find_by_low_cost(ticket)
+    return {
+        "ticket_number": ticket,
+        "status": "candidates_found" if hits else "no_candidates",
+        "gestionale_candidates": [session.pool.format_row(txn) for txn in hits[:10]],
+    }
+
+
 def _format_user_prompt(
     session: MatchSession,
     category: str,
     expedia_context: dict | None = None,
     document_group_context: dict | None = None,
+    low_cost_context: dict | None = None,
 ) -> str:
     expedia_section = ""
     if expedia_context is not None:
@@ -280,6 +299,14 @@ Candidati aggregati SIAP per stesso Documento+Codice Cliente:
 
 Se un gruppo ha somma coerente, stesso fornitore/contesto e non ci sono alternative equivalenti, puoi restituire tutti i suoi identificativi.
 """
+    low_cost_section = ""
+    if low_cost_context is not None:
+        low_cost_section = f"""
+Contesto low cost (NUM.BIGLIETTO Amex ↔ colonna Low Cost SIAP):
+{low_cost_context}
+
+Se gestionale_candidates non è vuoto, preferisci quelle righe: il codice biglietto è evidenza forte.
+"""
 
     return f"""Abbina questa transazione carta a righe del gestionale.
 
@@ -290,6 +317,7 @@ Transazione carta:
 - categoria suggerita: {category}
 {expedia_section}
 {document_group_section}
+{low_cost_section}
 
 Gestionale (tutte le righe; [available] o già abbinate):
 {session.pool.format_rows()}

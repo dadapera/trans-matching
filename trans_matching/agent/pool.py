@@ -12,6 +12,7 @@ from trans_matching.matchers.gestionale_text import (
     normalize_text,
 )
 from trans_matching.models import Transaction
+from trans_matching.parsers.gestionale import extract_siap_low_cost
 
 _DATE_IN_TEXT = re.compile(r"\b\d{1,2}/\d{1,2}/\d{2,4}\b")
 
@@ -131,7 +132,22 @@ class GestionalePool:
 
     def format_row(self, txn: Transaction) -> str:
         base = f"{txn.identificativo}|{txn.date}|{txn.amount}|{txn.description}"
+        low_cost = extract_siap_low_cost(txn.raw)
+        if low_cost:
+            base = f"{base}|LowCost:{low_cost}"
         return f"{base}  [available]"
+
+    def find_by_low_cost(self, ticket: str) -> list[Transaction]:
+        from trans_matching.parsers.gestionale import normalize_ticket_code
+
+        normalized = normalize_ticket_code(ticket)
+        if not normalized:
+            return []
+        return [
+            txn
+            for txn in self._all
+            if extract_siap_low_cost(txn.raw) == normalized
+        ]
 
     def search(
         self,
@@ -149,7 +165,8 @@ class GestionalePool:
         for txn in self._all:
             score = 0
             if text_norm:
-                haystack = normalize_text(txn.description)
+                low_cost = extract_siap_low_cost(txn.raw)
+                haystack = normalize_text(f"{txn.description} {low_cost}")
                 if text_norm in haystack:
                     score += 3
                 else:

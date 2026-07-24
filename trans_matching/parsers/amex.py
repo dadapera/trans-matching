@@ -52,6 +52,19 @@ _PAGE_BREAK = re.compile(
     re.IGNORECASE,
 )
 
+# Dettaglio volo OCR Amex: "NUM.BIGLIETTO KC38J4N" / "NUM. BIGLIETTO TS3L4F"
+_AMEX_TICKET = re.compile(r"NUM\.?\s*BIGLIETTO\s+([A-Z0-9]{4,20})", re.IGNORECASE)
+
+
+def extract_amex_ticket_number(description: str) -> str:
+    """Estrae NUM.BIGLIETTO dai dettagli Amex (da confrontare con SIAP Low Cost)."""
+    match = _AMEX_TICKET.search(description or "")
+    if not match:
+        return ""
+    from trans_matching.parsers.gestionale import normalize_ticket_code
+
+    return normalize_ticket_code(match.group(1))
+
 
 def parse_amex_file(
     path: Path,

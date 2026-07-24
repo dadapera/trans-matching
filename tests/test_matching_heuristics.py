@@ -16,6 +16,7 @@ def _txn(
     date: str = "08/06/2026",
     amount: str = "100.00",
     description: str = "RYA RYANAIR ROSSI/MARIO",
+    raw: str = "",
 ) -> Transaction:
     return Transaction(
         identificativo=identificativo,
@@ -23,6 +24,7 @@ def _txn(
         amount=Decimal(amount),
         description=description,
         source="test",
+        raw=raw,
     )
 
 
@@ -163,6 +165,7 @@ def test_document_group_sum_matches_same_siap_document() -> None:
 def test_siap_identificativo_uses_documento_and_codice_cliente() -> None:
     from trans_matching.parsers.gestionale import (
         _extract_gestionale_identificativo,
+        extract_siap_low_cost,
         format_siap_match_label,
     )
 
@@ -176,6 +179,49 @@ def test_siap_identificativo_uses_documento_and_codice_cliente() -> None:
         "BF       2602090001 20 1 2    113  10/02/26             76,00  TRE TRENITALIA"
     ) == "BF 2602090001"
     assert format_siap_match_label("LOW 8574") == "[LOW 8574]"
+    assert (
+        extract_siap_low_cost(
+            "LOW            8569 20 1 2    113  16/02/26            118,97  "
+            "EAS EASY JET        RUSSO/VALERIO                      0,00   9/02/26 N   KC38J4N"
+        )
+        == "KC38J4N"
+    )
+    assert (
+        extract_siap_low_cost(
+            "AUT            1485 20 1 2     83  11/05/26             25,98  "
+            "FB  FLIXBUS ITALIA  DEMARCO/MAURO                      0,00   7/05/26 N   335 260 16"
+        )
+        == "33526016"
+    )
+    assert (
+        extract_siap_low_cost(
+            "BF       2602090001 20 1 2    113  10/02/26             76,00  TRE TRENITALIA"
+        )
+        == ""
+    )
+
+
+def test_amex_ticket_matches_siap_low_cost_in_pool() -> None:
+    from trans_matching.parsers.amex import extract_amex_ticket_number
+
+    card_desc = (
+        "EASYJET LUTON ITINERARIO:DA: NAPLES CAPODICHINO "
+        "NUM.BIGLIETTO KC38J4N NOME PASSEGGERO VALERIO RUSSO"
+    )
+    assert extract_amex_ticket_number(card_desc) == "KC38J4N"
+
+    txn = _txn(
+        identificativo="LOW 8569",
+        amount="118.97",
+        description="EAS EASY JET        RUSSO/VALERIO",
+        raw=(
+            "LOW            8569 20 1 2    113  16/02/26            118,97  "
+            "EAS EASY JET        RUSSO/VALERIO                      0,00   9/02/26 N   KC38J4N"
+        ),
+    )
+    pool = GestionalePool([txn])
+    assert "LowCost:KC38J4N" in pool.format_row(txn)
+    assert pool.find_by_low_cost("KC38J4N") == [txn]
 
 
 def test_expedia_gate_rejects_transport_rows() -> None:
