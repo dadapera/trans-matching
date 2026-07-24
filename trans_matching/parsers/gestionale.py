@@ -81,6 +81,9 @@ def parse_gestionale_pdf(path: Path) -> list[Transaction]:
     return transactions
 
 
+_MULTI_PRACTICE_DOCS = frozenset({"PRT", "998"})
+
+
 def _parse_siap_documento_codice(raw: str) -> tuple[str, str]:
     tokens = raw.split()
     if not tokens:
@@ -91,7 +94,7 @@ def _parse_siap_documento_codice(raw: str) -> tuple[str, str]:
     if not tail:
         return documento, ""
 
-    if documento == "PRT":
+    if documento in _MULTI_PRACTICE_DOCS:
         numeri: list[str] = []
         for token in tail:
             if re.fullmatch(r"\d+", token):

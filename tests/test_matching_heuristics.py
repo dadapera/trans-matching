@@ -177,6 +177,9 @@ def test_siap_identificativo_uses_documento_and_codice_cliente() -> None:
         "PRT   26        171 20 1 1   4273  29/06/26            190,00  AUTO EUROPE"
     ) == "PRT 26 171"
     assert _extract_gestionale_identificativo(
+        "998   26         85 20 1 2    113   9/02/26 EUR        440,00  612 HOTEL REMILIA"
+    ) == "998 26 85"
+    assert _extract_gestionale_identificativo(
         "BF       2602090001 20 1 2    113  10/02/26             76,00  TRE TRENITALIA"
     ) == "BF 2602090001"
     assert format_siap_match_label("LOW 8574") == "[LOW 8574]"
