@@ -1,5 +1,9 @@
 import { useCallback, useRef, useState } from "react";
 import { FileText, Upload } from "lucide-react";
+import {
+  ensureNotificationPermission,
+  notifyParsingCompleted,
+} from "../notifications";
 import type { UploadResponse } from "../types";
 
 interface Props {
@@ -104,6 +108,7 @@ export function UploadPanel({
     setError(null);
     setProgressPct(0);
     setProgressMessage("Upload in corso…");
+    void ensureNotificationPermission();
     try {
       const { uploadFiles } = await import("../api");
       const res = await uploadFiles(cartaFile, gestionaleFile, (status) => {
@@ -112,6 +117,12 @@ export function UploadPanel({
       });
       setProgressPct(100);
       setProgressMessage("Completato");
+      notifyParsingCompleted({
+        cartaCount: res.carta_count,
+        gestionaleCount: res.gestionale_count,
+        cartaFilename: res.carta_filename,
+        gestionaleFilename: res.gestionale_filename,
+      });
       onUploaded(res);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload fallito");
