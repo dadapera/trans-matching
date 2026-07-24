@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from trans_matching.agent.pool import GestionalePool
+from trans_matching.agent.router import classify_card_transaction
 from trans_matching.agent.sum_check import find_amount_combinations, find_document_amount_groups
 from trans_matching.agent.tools import AGENT_TOOLS, apply_confidence_gate
 from trans_matching.matchers.gestionale_text import hotel_matches
@@ -222,6 +223,32 @@ def test_amex_ticket_matches_siap_low_cost_in_pool() -> None:
     pool = GestionalePool([txn])
     assert "LowCost:KC38J4N" in pool.format_row(txn)
     assert pool.find_by_low_cost("KC38J4N") == [txn]
+
+
+def test_auto_europe_router_and_supplier_search() -> None:
+    assert classify_card_transaction("WWW.AUTOEUROPE.DE MUNICH") == "auto_europe"
+    assert classify_card_transaction("WWW.AUTOEUROPE.DEMUNICH UBICAZIONE") == "auto_europe"
+    assert classify_card_transaction("RYANAIR LTD AIRLINE DUBLIN") == "generic"
+
+    auto_row = _txn(
+        identificativo="PRT 26 142",
+        date="22/06/2026",
+        amount="590.00",
+        description="AUTO EUROPE DEU DI PAOLO SIMONE",
+    )
+    other_row = _txn(
+        identificativo="LOW 8570",
+        amount="217.66",
+        description="RYA RYANAIR BECCHI/GABRIELE",
+    )
+    pool = GestionalePool([auto_row, other_row])
+    hits = pool.search(
+        text="AUTO EUROPE",
+        amount=Decimal("587.95"),
+        card_date="23/02/2026",
+        date_window_days=30,
+    )
+    assert hits == [auto_row]
 
 
 def test_expedia_gate_rejects_transport_rows() -> None:

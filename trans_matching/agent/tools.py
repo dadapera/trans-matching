@@ -227,6 +227,34 @@ def collect_expedia_context(session, booking_code: str = "") -> dict:
     return payload
 
 
+_AUTO_EUROPE_SUPPLIER = "AUTO EUROPE"
+
+
+def collect_auto_europe_context(session) -> dict:
+    """Righe gestionale con fornitore AUTO EUROPE (noleggio auto)."""
+    started = time.perf_counter()
+    hits = session.pool.search(
+        text=_AUTO_EUROPE_SUPPLIER,
+        amount=session.card.amount,
+        card_date=session.card.date,
+        date_window_days=session.date_window_days,
+        amount_tolerance_pct=15.0,
+        limit=15,
+    )
+    payload = {
+        "status": "candidates_found" if hits else "no_candidates",
+        "supplier": _AUTO_EUROPE_SUPPLIER,
+        "gestionale_candidates": [session.pool.format_row(txn) for txn in hits],
+    }
+    _log_tool(
+        session,
+        "auto_europe_context",
+        {"status": payload["status"], "candidates": len(hits)},
+        started,
+    )
+    return payload
+
+
 @tool
 def search_msc(search_date: str = "") -> str:
     """Cerca tutte le email MSC per mittente nel range ±7 giorni dalla data indicata."""

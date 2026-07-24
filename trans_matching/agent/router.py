@@ -3,10 +3,11 @@ from __future__ import annotations
 import re
 from typing import Literal
 
-CardCategory = Literal["expedia", "msc", "generic"]
+CardCategory = Literal["expedia", "msc", "auto_europe", "generic"]
 
 _EXPEDIA = re.compile(r"EG\*TRVL", re.IGNORECASE)
 _MSC = re.compile(r"mscbook\.it|MSC Cruises", re.IGNORECASE)
+_AUTO_EUROPE = re.compile(r"AUTOEUROPE", re.IGNORECASE)
 
 
 def classify_card_transaction(description: str) -> CardCategory:
@@ -14,4 +15,6 @@ def classify_card_transaction(description: str) -> CardCategory:
         return "expedia"
     if _MSC.search(description):
         return "msc"
+    if _AUTO_EUROPE.search(description):
+        return "auto_europe"
     return "generic"

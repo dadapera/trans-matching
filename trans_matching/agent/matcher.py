@@ -15,6 +15,7 @@ from trans_matching.agent.tools import (
     AGENT_TOOLS,
     build_result_from_output,
     clean_identificativi,
+    collect_auto_europe_context,
     collect_document_group_context,
     collect_expedia_context,
     collect_msc_context,
@@ -49,7 +50,7 @@ class AgentMatchOutput(BaseModel):
         default_factory=list,
         description="Altri candidati plausibili se il match è incerto",
     )
-    strategy: Literal["expedia", "msc", "sum", "gestionale", "generic"] = "generic"
+    strategy: Literal["expedia", "msc", "auto_europe", "sum", "gestionale", "generic"] = "generic"
 
 
 _SYSTEM_PROMPT = """Sei un agente contabile che abbina transazioni carta di credito Amex a righe del gestionale SIAP.
@@ -63,12 +64,14 @@ Workflow consigliato:
    Le pratiche possono avere più righe SIAP, storni o importi non identici: restituisci più identificativi solo se il gruppo ha lo stesso ospite (coerente a tuo giudizio).
    VIETATO: scegliere una riga SIAP solo perché l'importo è simile se i nomi indicano chiaramente persone diverse. In quel caso lascia identificativi vuoti (confidence basso).
 2. Se è MSC (mscbook.it / MSC Cruises) → il backend estrae i cognomi passeggeri dagli allegati; non cercare match gestionale.
-3. Se nei dettagli Amex compare NUM.BIGLIETTO (voli low cost: Ryanair, EasyJet, Wizz, Vueling, …) → confrontalo con il campo LowCost: delle righe SIAP (colonna Low Cost del gestionale).
+3. Se è Auto Europe (WWW.AUTOEUROPE.DE / AUTOEUROPE) → cerca righe gestionale con fornitore "AUTO EUROPE" nella descrizione SIAP.
+   Parti dai candidati nel contesto Auto Europe; affina con importo, data e nome passeggero (COGNOME/NOME in descrizione).
+4. Se nei dettagli Amex compare NUM.BIGLIETTO (voli low cost: Ryanair, EasyJet, Wizz, Vueling, …) → confrontalo con il campo LowCost: delle righe SIAP (colonna Low Cost del gestionale).
    Un codice biglietto uguale (ignorando spazi) è evidenza FORTE di match; preferiscilo a solo importo/data.
-4. Se l'importo potrebbe essere suddiviso su più righe dello stesso Documento+Codice Cliente → usa check_document_group_sum.
-5. Se resta una somma multi-riga non coperta dal documento → usa check_sum.
-6. Per casi generici → interpreta direttamente le righe gestionale in context, usando codici fornitore e COGNOME/NOME nelle descrizioni SIAP.
-7. Prima di concludere con importi diversi → compare_amount.
+5. Se l'importo potrebbe essere suddiviso su più righe dello stesso Documento+Codice Cliente → usa check_document_group_sum.
+6. Se resta una somma multi-riga non coperta dal documento → usa check_sum.
+7. Per casi generici → interpreta direttamente le righe gestionale in context, usando codici fornitore e COGNOME/NOME nelle descrizioni SIAP.
+8. Prima di concludere con importi diversi → compare_amount.
 
 Regole confidenza:
 - "alto": match univoco e coerente (ospite/fornitore/data/importo). Per Expedia l'ospite deve essere lo stesso a tuo giudizio (anche se troncato o invertito). Per low cost, NUM.BIGLIETTO = LowCost è sufficiente per alto se non ci sono conflitti.
@@ -170,12 +173,16 @@ def match_one(session: MatchSession) -> AgentMatchResult:
             return agent_result
         document_group_context = collect_document_group_context(session)
         low_cost_context = _collect_low_cost_context(session)
+        auto_europe_context = (
+            collect_auto_europe_context(session) if category == "auto_europe" else None
+        )
         user_prompt = _format_user_prompt(
             session,
             category,
             expedia_context,
             document_group_context,
             low_cost_context,
+            auto_europe_context,
         )
 
         callback = AgentTraceCallback()
@@ -279,6 +286,7 @@ def _format_user_prompt(
     expedia_context: dict | None = None,
     document_group_context: dict | None = None,
     low_cost_context: dict | None = None,
+    auto_europe_context: dict | None = None,
 ) -> str:
     expedia_section = ""
     if expedia_context is not None:
@@ -307,6 +315,14 @@ Contesto low cost (NUM.BIGLIETTO Amex ↔ colonna Low Cost SIAP):
 
 Se gestionale_candidates non è vuoto, preferisci quelle righe: il codice biglietto è evidenza forte.
 """
+    auto_europe_section = ""
+    if auto_europe_context is not None:
+        auto_europe_section = f"""
+Contesto Auto Europe (fornitore gestionale "AUTO EUROPE"):
+{auto_europe_context}
+
+Cerca il match tra queste righe SIAP: fornitore AUTO EUROPE, poi importo/data/nome passeggero.
+"""
 
     return f"""Abbina questa transazione carta a righe del gestionale.
 
@@ -318,6 +334,7 @@ Transazione carta:
 {expedia_section}
 {document_group_section}
 {low_cost_section}
+{auto_europe_section}
 
 Gestionale (tutte le righe; [available] o già abbinate):
 {session.pool.format_rows()}
