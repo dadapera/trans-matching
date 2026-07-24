@@ -234,6 +234,16 @@ def save_agent_match_result(
         conn.commit()
 
 
+def mark_orphaned_running_runs(*, db_path: Path = DB_PATH) -> int:
+    """Mark runs left as ``running`` after a process crash/restart."""
+    with _connect(db_path) as conn:
+        cursor = conn.execute(
+            "UPDATE agent_runs SET status = 'error' WHERE status = 'running'"
+        )
+        conn.commit()
+        return int(cursor.rowcount)
+
+
 def update_agent_run(
     run_id: int,
     *,

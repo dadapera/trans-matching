@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import {
   fetchResults,
   fetchRunList,
   fetchRunStatus,
   fetchSession,
+  isRunNotFoundError,
+  SERVER_LOST_DURING_RUN,
   startRun,
   stopRun,
   subscribeRunEvents,
@@ -22,6 +24,9 @@ import type {
   TabId,
   UploadResponse,
 } from "./types";
+
+const RUN_DISCONNECT_GRACE_MS = 45_000;
+const RUN_WATCHDOG_MS = 15_000;
 
 export default function App() {
   const [sessionReady, setSessionReady] = useState(false);
@@ -45,6 +50,9 @@ export default function App() {
   const [resultFilter, setResultFilter] = useState<ResultFilter>("all");
   const [runList, setRunList] = useState<RunListItem[]>([]);
   const [transactionRange, setTransactionRange] = useState<[number, number]>([1, 1]);
+
+  const progressRef = useRef({ processed: 0, expected: 0, matchedCount: 0 });
+  progressRef.current = { processed, expected, matchedCount };
 
   const running = status === "running" || status === "stopping";
   const transactionCount = cartaCount ?? 0;
@@ -98,10 +106,118 @@ export default function App() {
 
   useEffect(() => {
     if (runId === null) return;
+    // Historical / finished runs: no live stream (avoids false "server lost" probes).
+    if (status !== "running" && status !== "stopping") return;
 
-    const unsubscribe = subscribeRunEvents(
+    let cancelled = false;
+    let fatal = false;
+    let probing = false;
+    let disconnectSince: number | null = null;
+    let probeTimer: ReturnType<typeof setTimeout> | null = null;
+    let unsubscribe: () => void = () => undefined;
+
+    const markLost = (message: string) => {
+      if (cancelled || fatal) return;
+      fatal = true;
+      const snap = progressRef.current;
+      setStatus("error");
+      setError(message);
+      notifyRunFinished({
+        runId,
+        status: "error",
+        matched: snap.matchedCount,
+        processed: snap.processed,
+        expected: snap.expected,
+        error: message,
+      });
+      fetchRunList().then(setRunList).catch(() => undefined);
+      unsubscribe();
+    };
+
+    const applyTerminalStatus = (
+      finalStatus: string,
+      overrides?: { processed?: number; expected?: number; matched?: number; error?: string },
+    ) => {
+      if (cancelled || fatal) return;
+      fatal = true;
+      const snap = progressRef.current;
+      setStatus(finalStatus);
+      if (overrides?.processed !== undefined) setProcessed(overrides.processed);
+      if (overrides?.expected !== undefined) setExpected(overrides.expected);
+      if (overrides?.matched !== undefined) setMatchedCount(overrides.matched);
+      if (finalStatus === "error") {
+        setError(overrides?.error ?? "La run è terminata con errore.");
+      }
+      notifyRunFinished({
+        runId,
+        status: finalStatus,
+        matched: overrides?.matched ?? snap.matchedCount,
+        processed: overrides?.processed ?? snap.processed,
+        expected: overrides?.expected ?? snap.expected,
+        error: overrides?.error,
+      });
+      fetchRunList().then(setRunList).catch(() => undefined);
+      unsubscribe();
+    };
+
+    const probeRunHealth = async () => {
+      if (cancelled || fatal || probing) return;
+      probing = true;
+      try {
+        const [runStatus, session] = await Promise.all([fetchRunStatus(runId), fetchSession()]);
+        if (cancelled || fatal) return;
+        disconnectSince = null;
+
+        if (runStatus.status === "running" || runStatus.status === "stopping") {
+          // Process restarted: DB may still say running, but nothing is active in-memory.
+          if (session.active_run_id !== runId) {
+            markLost(SERVER_LOST_DURING_RUN);
+            return;
+          }
+          setStatus(runStatus.status);
+          setProcessed(runStatus.processed);
+          setExpected(runStatus.expected);
+          setMatchedCount(runStatus.matched_count);
+          return;
+        }
+
+        applyTerminalStatus(runStatus.status, {
+          processed: runStatus.processed,
+          expected: runStatus.expected,
+          matched: runStatus.matched_count,
+          error:
+            runStatus.status === "error"
+              ? "La run è terminata con errore (possibile riavvio del server)."
+              : undefined,
+        });
+      } catch (err) {
+        if (cancelled || fatal) return;
+        if (isRunNotFoundError(err)) {
+          markLost(SERVER_LOST_DURING_RUN);
+          return;
+        }
+        if (disconnectSince !== null && Date.now() - disconnectSince >= RUN_DISCONNECT_GRACE_MS) {
+          markLost(SERVER_LOST_DURING_RUN);
+        }
+      } finally {
+        probing = false;
+      }
+    };
+
+    const scheduleProbe = () => {
+      if (probeTimer !== null) return;
+      probeTimer = setTimeout(() => {
+        probeTimer = null;
+        void probeRunHealth();
+      }, 1500);
+    };
+
+    unsubscribe = subscribeRunEvents(
       runId,
       (data) => {
+        if (cancelled || fatal) return;
+        disconnectSince = null;
+
         if (data.type === "agent_event") {
           setEvents((prev) => [...prev, data as AgentEvent]);
         } else if (data.type === "match_result" && data.result) {
@@ -111,7 +227,7 @@ export default function App() {
             if (exists) return prev;
             return [...prev, result].sort((a, b) => a.row_number - b.row_number);
           });
-          setProcessed((p) => Math.min(expected || p + 1, p + 1));
+          setProcessed((p) => p + 1);
           if (result.matched) setMatchedCount((m) => m + 1);
         } else if (data.type === "run_progress") {
           setProcessed(data.processed as number);
@@ -126,48 +242,39 @@ export default function App() {
         } else if (data.type === "run_stopping") {
           setStatus("stopping");
         } else if (data.type === "run_finished") {
-          const finalStatus = data.status as string;
-          setStatus(finalStatus);
-          setProcessed(data.processed as number);
-          setExpected(data.expected as number);
-          setMatchedCount(data.matched as number);
-          notifyRunFinished({
-            runId,
-            status: finalStatus,
-            matched: data.matched as number,
+          applyTerminalStatus(data.status as string, {
             processed: data.processed as number,
             expected: data.expected as number,
+            matched: data.matched as number,
           });
-          fetchRunList().then(setRunList).catch(() => undefined);
         } else if (data.type === "run_error") {
           const message = data.error as string;
-          setStatus("error");
-          setError(message);
-          notifyRunFinished({
-            runId,
-            status: "error",
-            matched: matchedCount,
-            processed,
-            expected,
-            error: message,
-          });
-        } else {
+          applyTerminalStatus("error", { error: message });
+        } else if (data.type !== "connected") {
           setEvents((prev) => [...prev, data as AgentEvent]);
         }
       },
       () => {
-        if (runId !== null) {
-          fetchRunStatus(runId)
-            .then((s) => {
-              if (s.status !== "running") setStatus(s.status);
-            })
-            .catch(() => undefined);
+        if (cancelled || fatal) return;
+        if (disconnectSince === null) disconnectSince = Date.now();
+        scheduleProbe();
+        if (Date.now() - disconnectSince >= RUN_DISCONNECT_GRACE_MS) {
+          void probeRunHealth();
         }
       },
     );
 
-    return unsubscribe;
-  }, [expected, matchedCount, processed, runId]);
+    const watchdog = setInterval(() => {
+      void probeRunHealth();
+    }, RUN_WATCHDOG_MS);
+
+    return () => {
+      cancelled = true;
+      if (probeTimer !== null) clearTimeout(probeTimer);
+      clearInterval(watchdog);
+      unsubscribe();
+    };
+  }, [runId, status]);
 
   const handleUploaded = (info: UploadResponse) => {
     setSessionReady(true);

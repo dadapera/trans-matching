@@ -200,6 +200,8 @@ class RunManager:
         with self._lock:
             if self._active is None:
                 return None
+            if self._active.status not in {"running", "stopping"}:
+                return None
             return self._active.run_id
 
     def start_run(self, row_start: int | None = None, row_end: int | None = None) -> int:

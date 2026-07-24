@@ -38,7 +38,7 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function isTransientNetworkError(err: unknown): boolean {
+export function isTransientNetworkError(err: unknown): boolean {
   if (!(err instanceof Error)) return false;
   const msg = err.message.toLowerCase();
   return (
@@ -48,6 +48,20 @@ function isTransientNetworkError(err: unknown): boolean {
     msg.includes("load failed")
   );
 }
+
+export function isRunNotFoundError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const msg = err.message.toLowerCase();
+  return (
+    msg.includes("non trovata") ||
+    msg.includes("not found") ||
+    msg.includes("errore http 404")
+  );
+}
+
+/** Shown when the web process dies mid-run (OOM/restart) and the UI loses the SSE stream. */
+export const SERVER_LOST_DURING_RUN =
+  "Il server si è riavviato o non risponde più durante l'analisi. Ricarica i documenti e rilancia.";
 
 export async function fetchSession(): Promise<SessionInfo> {
   return request<SessionInfo>("/api/session");
@@ -152,6 +166,7 @@ export function subscribeRunEvents(
   onError?: (err: Event) => void,
 ): () => void {
   const source = new EventSource(`/api/runs/${runId}/events`);
+  let closed = false;
 
   source.onmessage = (msg) => {
     try {
@@ -163,8 +178,12 @@ export function subscribeRunEvents(
   };
 
   source.onerror = (err) => {
+    if (closed) return;
     onError?.(err);
   };
 
-  return () => source.close();
+  return () => {
+    closed = true;
+    source.close();
+  };
 }

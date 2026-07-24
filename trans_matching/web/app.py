@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import asyncio
+import logging
+from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import AsyncIterator
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from trans_matching.storage.agent_repository import list_agent_runs
+from trans_matching.storage.agent_repository import list_agent_runs, mark_orphaned_running_runs
 from trans_matching.email import verify_gmail_connection
 from trans_matching.web.run_manager import run_manager
 from trans_matching.web.schemas import (
@@ -23,8 +26,18 @@ from trans_matching.web.upload import read_upload_bytes
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 DASHBOARD_DIST = ROOT / "dashboard" / "dist"
+logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Trans Matching Dashboard", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    orphaned = mark_orphaned_running_runs()
+    if orphaned:
+        logger.warning("Marked %s orphaned running run(s) as error after restart", orphaned)
+    yield
+
+
+app = FastAPI(title="Trans Matching Dashboard", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
