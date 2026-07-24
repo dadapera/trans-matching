@@ -133,12 +133,24 @@ def match_one(session: MatchSession) -> AgentMatchResult:
         if category == "msc":
             msc_context = collect_msc_context(session)
             surnames = msc_context.get("passenger_surnames", [])
-            surnames_text = ", ".join(surnames) if surnames else "non trovati"
+            if surnames:
+                surnames_text = ", ".join(surnames)
+                reason = (
+                    f"MSCBOOK: cognomi passeggeri {surnames_text}. "
+                    "Match gestionale non eseguito."
+                )
+            elif msc_context.get("skipped_attachments"):
+                reason = (
+                    "MSCBOOK: cognomi non estratti (allegati saltati per memoria). "
+                    "Match gestionale non eseguito."
+                )
+            else:
+                reason = "MSCBOOK: cognomi passeggeri non trovati. Match gestionale non eseguito."
             agent_result = AgentMatchResult(
                 card=session.card,
                 matched=False,
                 confidence="basso",
-                reason=f"MSCBOOK: cognomi passeggeri {surnames_text}. Match gestionale non eseguito.",
+                reason=reason,
                 strategy="msc",
                 trace_id=session.trace_id,
                 row_number=session.row_number,

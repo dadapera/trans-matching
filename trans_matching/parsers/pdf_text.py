@@ -1,7 +1,13 @@
 from __future__ import annotations
 
 import gc
+import json
+import os
 import statistics
+import subprocess
+import sys
+import tempfile
+import time
 from collections import defaultdict
 from collections.abc import Callable
 from pathlib import Path
@@ -14,6 +20,7 @@ ProgressCallback = Callable[[int, int, str], None]
 _DEFAULT_OCR_DPI = 96
 _OCR_MAX_SIDE_LEN = 960
 _OCR_DET_LIMIT_SIDE_LEN = 640
+_OCR_PROGRESS_POLL_SECONDS = 0.25
 
 
 def extract_pdf_text(path: Path) -> str:
@@ -41,8 +48,109 @@ def extract_pdf_lines_ocr(
     *,
     dpi: int = _DEFAULT_OCR_DPI,
     on_progress: ProgressCallback | None = None,
+    in_subprocess: bool | None = None,
 ) -> list[str]:
-    """OCR per PDF senza text layer (es. estratti Amex stampati in PDF)."""
+    """OCR per PDF senza text layer (es. estratti Amex stampati in PDF).
+
+    Di default gira in un processo figlio: quando termina, onnxruntime/OpenCV
+    liberano davvero la RSS del parent (necessario su Render 512MB).
+    """
+    use_subprocess = (
+        _env_bool("OCR_IN_SUBPROCESS", True) if in_subprocess is None else in_subprocess
+    )
+    if use_subprocess:
+        return _extract_pdf_lines_ocr_subprocess(path, dpi=dpi, on_progress=on_progress)
+    return _extract_pdf_lines_ocr_inprocess(path, dpi=dpi, on_progress=on_progress)
+
+
+def _extract_pdf_lines_ocr_subprocess(
+    path: Path,
+    *,
+    dpi: int,
+    on_progress: ProgressCallback | None,
+) -> list[str]:
+    path = path.resolve()
+    with tempfile.TemporaryDirectory(prefix="amex-ocr-") as tmp:
+        tmp_dir = Path(tmp)
+        out_path = tmp_dir / "result.json"
+        progress_path = tmp_dir / "progress.json"
+        cmd = [
+            sys.executable,
+            "-m",
+            "trans_matching.parsers.ocr_worker",
+            str(path),
+            str(dpi),
+            str(out_path),
+            str(progress_path),
+        ]
+        env = os.environ.copy()
+        env.setdefault("PYTHONPATH", str(Path(__file__).resolve().parents[2]))
+        # Avoid re-entering subprocess from the worker.
+        env["OCR_IN_SUBPROCESS"] = "0"
+
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            env=env,
+        )
+        last_key: tuple[int, int, str] | None = None
+        try:
+            while proc.poll() is None:
+                last_key = _relay_progress(progress_path, on_progress, last_key)
+                time.sleep(_OCR_PROGRESS_POLL_SECONDS)
+            # Final progress flush after exit.
+            _relay_progress(progress_path, on_progress, last_key)
+            stdout, stderr = proc.communicate(timeout=30)
+        except Exception:
+            proc.kill()
+            proc.wait(timeout=10)
+            raise
+
+        if proc.returncode != 0:
+            detail = (stderr or stdout or "").strip() or f"exit {proc.returncode}"
+            raise RuntimeError(f"OCR subprocess fallito: {detail}")
+
+        if not out_path.exists():
+            raise RuntimeError("OCR subprocess terminato senza file risultato")
+
+        payload = json.loads(out_path.read_text(encoding="utf-8"))
+        if not payload.get("ok"):
+            raise RuntimeError(payload.get("error") or "OCR subprocess errore sconosciuto")
+        lines = payload.get("lines")
+        if not isinstance(lines, list):
+            raise RuntimeError("OCR subprocess: risultato lines non valido")
+        return [str(line) for line in lines]
+
+
+def _relay_progress(
+    progress_path: Path,
+    on_progress: ProgressCallback | None,
+    last_key: tuple[int, int, str] | None,
+) -> tuple[int, int, str] | None:
+    if on_progress is None or not progress_path.exists():
+        return last_key
+    try:
+        data = json.loads(progress_path.read_text(encoding="utf-8"))
+        current = int(data["current"])
+        total = int(data["total"])
+        message = str(data.get("message") or "")
+    except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError):
+        return last_key
+    key = (current, total, message)
+    if key != last_key:
+        on_progress(current, total, message)
+    return key
+
+
+def _extract_pdf_lines_ocr_inprocess(
+    path: Path,
+    *,
+    dpi: int = _DEFAULT_OCR_DPI,
+    on_progress: ProgressCallback | None = None,
+) -> list[str]:
+    """OCR nel processo corrente (usato dal worker subprocess)."""
     import fitz
     import numpy as np
 
@@ -183,3 +291,10 @@ def _group_ocr_rows(result: list, *, row_height: int | None = None) -> list[str]
         parts = [text for _x, text in sorted(rows[_y])]
         grouped.append(" ".join(parts))
     return grouped
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None or not raw.strip():
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}

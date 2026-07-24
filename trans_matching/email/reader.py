@@ -246,6 +246,43 @@ class GmailReader:
             if message is not None:
                 yield message
 
+    def fetch_uid(
+        self,
+        uid: str,
+        *,
+        include_body: bool = True,
+        include_attachments: bool = False,
+        max_body_bytes: int | None = None,
+    ) -> EmailMessage | None:
+        """Fetch a single message by UID (used after a cheap header scan)."""
+        query = EmailSearchQuery(
+            include_body=include_body,
+            include_attachments=include_attachments,
+            max_body_bytes=max_body_bytes,
+        )
+        fetch_query = _fetch_query(query)
+        uid_bytes = uid.encode() if isinstance(uid, str) else uid
+
+        def _fetch(mail: imaplib.IMAP4_SSL) -> EmailMessage | None:
+            try:
+                status, fetched = mail.uid("fetch", uid_bytes, fetch_query)
+            except (TimeoutError, OSError):
+                self.disconnect()
+                return None
+            if status != "OK" or not fetched or not fetched[0]:
+                return None
+            raw = fetched[0][1]
+            if not isinstance(raw, bytes):
+                return None
+            return _parse_message(
+                uid_bytes,
+                raw,
+                include_body=include_body,
+                include_attachments=include_attachments,
+            )
+
+        return self._run_imap(_fetch)
+
     def search_by_text(
         self,
         text: str,

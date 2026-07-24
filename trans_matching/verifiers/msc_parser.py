@@ -18,6 +18,9 @@ _MSC_PASSENGER = re.compile(
     re.IGNORECASE,
 )
 _BOOKING_FILENAME = re.compile(r"numero\s+di\s+prenotazione", re.IGNORECASE)
+# ponytail: hard caps for 512MB hosts; raise if plan has more RAM.
+_MAX_BOOKING_PDF_BYTES = 600_000
+_MAX_BOOKING_PDF_PAGES = 2
 
 
 def parse_msc_email(
@@ -67,6 +70,8 @@ def parse_msc_subject(subject: str) -> dict[str, str | None]:
 
 
 def parse_msc_booking_pdf(data: bytes) -> dict[str, object] | None:
+    if len(data) > _MAX_BOOKING_PDF_BYTES:
+        return None
     text = _extract_pdf_text(data)
     if not text:
         return None
@@ -100,7 +105,8 @@ def _is_booking_pdf(attachment: EmailAttachment) -> bool:
 def _extract_pdf_text(data: bytes) -> str:
     try:
         reader = PdfReader(BytesIO(data))
-        return "\n".join(page.extract_text() or "" for page in reader.pages)
+        pages = reader.pages[:_MAX_BOOKING_PDF_PAGES]
+        return "\n".join(page.extract_text() or "" for page in pages)
     except Exception:
         return ""
 

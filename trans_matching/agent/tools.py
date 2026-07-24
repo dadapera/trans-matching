@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import gc
 import json
 import time
 from datetime import timedelta
@@ -23,9 +24,24 @@ from trans_matching.verifiers.expedia_trvl import (
     pick_best_email,
     search_expedia_emails,
 )
-from trans_matching.verifiers.msc_parser import parse_msc_email
+from trans_matching.verifiers.msc_parser import parse_msc_email, parse_msc_subject
 
 _MSC_EMAIL_WINDOW_DAYS = 7
+# ponytail: at most one full RFC822+PDF on 512MB; raise if plan has more RAM.
+_MSC_FULL_FETCH_LIMIT = 1
+# Skip heavy PDF fetch when already near the 512MB cgroup limit.
+_MSC_RSS_SKIP_FULL_FETCH = 380 * 1024 * 1024
+
+
+def _process_rss_bytes() -> int | None:
+    try:
+        with open("/proc/self/status", encoding="utf-8") as handle:
+            for line in handle:
+                if line.startswith("VmRSS:"):
+                    return int(line.split()[1]) * 1024
+    except (OSError, ValueError, IndexError):
+        return None
+    return None
 
 
 @tool
@@ -222,7 +238,9 @@ def search_msc(search_date: str = "") -> str:
 def collect_msc_context(session, search_date: str = "") -> dict:
     """Raccoglie cognomi passeggeri dagli allegati booking MSC.
 
-    Scarica/parsa una email alla volta e scarta allegati subito: evita OOM su 512MB.
+    1) scan solo header (leggero)
+    2) filtra subject booking
+    3) scarica al massimo 1 email completa+PDF
     """
     started = time.perf_counter()
     config = get_msc_email_config()
@@ -234,18 +252,21 @@ def collect_msc_context(session, search_date: str = "") -> dict:
         _log_tool(session, "msc_context", payload, started)
         return payload
 
+    gc.collect()
     surnames: set[str] = set()
     emails_scanned = 0
+    headers_scanned = 0
+    booking_candidates = 0
     stopped_early = False
+
     for from_address in config.from_addresses:
-        query = EmailSearchQuery(
+        header_query = EmailSearchQuery(
             from_address=from_address,
             since=window_start.date(),
             before=(window_end + timedelta(days=1)).date(),
-            include_body=True,
-            include_attachments=True,
+            include_body=False,
+            include_attachments=False,
             max_results=config.max_results,
-            max_body_bytes=config.max_body_bytes,
         )
 
         def _log_uids(count: int, *, _from=from_address) -> None:
@@ -260,7 +281,35 @@ def collect_msc_context(session, search_date: str = "") -> dict:
                 results=count,
             )
 
-        for mail in session.reader.iter_search(query, on_uids=_log_uids):
+        booking_uids: list[str] = []
+        for header in session.reader.iter_search(header_query, on_uids=_log_uids):
+            headers_scanned += 1
+            if parse_msc_subject(header.subject).get("booking_code"):
+                booking_uids.append(header.uid)
+        booking_candidates += len(booking_uids)
+
+        rss = _process_rss_bytes()
+        if rss is not None and rss >= _MSC_RSS_SKIP_FULL_FETCH:
+            session.logger.log(
+                "msc_skip_attachments",
+                trace_id=session.trace_id,
+                reason="rss_high",
+                rss_mb=round(rss / (1024 * 1024), 1),
+                booking_candidates=len(booking_uids),
+            )
+            break
+
+        # Newest booking subjects first (UID list is chronological).
+        for uid in reversed(booking_uids):
+            if emails_scanned >= _MSC_FULL_FETCH_LIMIT:
+                break
+            mail = session.reader.fetch_uid(
+                uid,
+                include_body=True,
+                include_attachments=True,
+            )
+            if mail is None:
+                continue
             emails_scanned += 1
             parsed = parse_msc_email(
                 mail.body,
@@ -271,25 +320,39 @@ def collect_msc_context(session, search_date: str = "") -> dict:
             for surname in parsed.get("passenger_surnames", []):
                 if isinstance(surname, str) and surname:
                     surnames.add(surname)
-            # Drop heavy fields before next IMAP fetch.
             del mail
-            # ponytail: early-stop after first booking PDF with surnames; ceiling =
-            # other MSC emails in the same ±7d window are skipped. Re-scan all if needed.
+            gc.collect()
             if surnames:
                 stopped_early = True
                 break
-        if stopped_early:
+        if stopped_early or emails_scanned >= _MSC_FULL_FETCH_LIMIT:
             break
 
     sorted_surnames = sorted(surnames)
+    rss = _process_rss_bytes()
+    skipped_attachments = (
+        emails_scanned == 0
+        and booking_candidates > 0
+        and rss is not None
+        and rss >= _MSC_RSS_SKIP_FULL_FETCH
+    )
+    if sorted_surnames:
+        status = "passengers_found"
+    elif skipped_attachments:
+        status = "skipped_attachments"
+    else:
+        status = "no_passengers"
     payload = {
-        "status": "passengers_found" if sorted_surnames else "no_passengers",
+        "status": status,
         "search_date": target_date,
         "date_window_days": _MSC_EMAIL_WINDOW_DAYS,
         "max_results_per_sender": config.max_results,
         "max_body_bytes": config.max_body_bytes,
+        "headers_scanned": headers_scanned,
+        "booking_candidates": booking_candidates,
         "emails_scanned": emails_scanned,
         "stopped_early": stopped_early,
+        "skipped_attachments": skipped_attachments,
         "passenger_surnames": sorted_surnames,
     }
     _log_tool(
@@ -297,9 +360,12 @@ def collect_msc_context(session, search_date: str = "") -> dict:
         "msc_context",
         {
             "status": payload["status"],
+            "headers": headers_scanned,
+            "booking_candidates": booking_candidates,
             "emails": emails_scanned,
             "passenger_surnames": sorted_surnames,
             "stopped_early": stopped_early,
+            "skipped_attachments": skipped_attachments,
         },
         started,
     )
