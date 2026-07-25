@@ -68,6 +68,52 @@ def test_duplicate_identifier_disambiguated_by_card_amount() -> None:
     ) == [second]
 
 
+def test_identical_siap_clone_rows_do_not_double_amount_gate() -> None:
+    """Clone SIAP lines (same id/date/amount/desc) must not sum twice (#90 Ryanair)."""
+    clone_a = _txn(
+        identificativo="LOW 8596",
+        date="06/04/2026",
+        amount="1081.96",
+        description="RYA RYANAIR         MAULONI LAURENZI ANT",
+        raw="LOW 8596 +1081.96 A",
+    )
+    storno = _txn(
+        identificativo="LOW 8596",
+        date="06/04/2026",
+        amount="-1081.96",
+        description="RYA RYANAIR         MAULONI LAURENZI ANT",
+        raw="LOW 8596 -1081.96",
+    )
+    clone_b = _txn(
+        identificativo="LOW 8596",
+        date="06/04/2026",
+        amount="1081.96",
+        description="RYA RYANAIR         MAULONI LAURENZI ANT",
+        raw="LOW 8596 +1081.96 B",
+    )
+    pool = GestionalePool([clone_a, storno, clone_b])
+    ref = "LOW 8596|06/04/2026|1081.96|RYA RYANAIR         MAULONI LAURENZI ANT"
+
+    assert pool.find_by_identificativi([ref]) == [clone_a]
+
+    card = _txn(
+        amount="1081.96",
+        description="RYANAIR LTD AIRLINE DUBLIN NUM. BIGLIETTO TP54MR",
+    )
+    matched, resolved, confidence, reason = apply_confidence_gate(
+        card=card,
+        confidence="alto",
+        identificativi=[ref],
+        alternatives=[],
+        pool=pool,
+        card_row_number=90,
+    )
+    assert matched is True
+    assert resolved == [clone_a]
+    assert confidence == "alto"
+    assert reason is None
+
+
 def test_confidence_gate_rejects_large_amount_delta() -> None:
     card = _txn(amount="100.00")
     gestionale = _txn(identificativo="BAW 2507 20", amount="200.42")

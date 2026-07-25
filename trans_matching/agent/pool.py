@@ -147,35 +147,50 @@ class GestionalePool:
                 matched_targets |= hit
 
         unresolved = targets - matched_targets
-        if not unresolved or card_amount is None:
-            return found
+        if unresolved and card_amount is not None:
+            # Short IDs that appear on multiple SIAP rows are omitted from aliases.
+            # Disambiguate with card amount so the gate does not drop an otherwise
+            # confident agent choice (Auto Europe, multi-row PRT/LOW, …).
+            for target in unresolved:
+                if "|" in target:
+                    continue
+                candidates = [
+                    txn
+                    for txn in self._all
+                    if self._normalize_identifier(txn.identificativo) == target
+                ]
+                if not candidates:
+                    continue
+                within = [
+                    txn
+                    for txn in candidates
+                    if self._amount_within_tolerance(
+                        card_amount, txn.amount, amount_tolerance_pct
+                    )
+                ]
+                if not within:
+                    continue
+                best = min(within, key=lambda txn: abs(txn.amount - card_amount))
+                if best not in found:
+                    found.append(best)
 
-        # Short IDs that appear on multiple SIAP rows are omitted from aliases.
-        # Disambiguate with card amount so the gate does not drop an otherwise
-        # confident agent choice (Auto Europe, multi-row PRT/LOW, …).
-        for target in unresolved:
-            if "|" in target:
+        # SIAP can list clone rows (same id/date/amount/desc, different movement).
+        # Counting each clone would double the total and falsely trip the amount gate.
+        return self._dedupe_identical_rows(found)
+
+    @staticmethod
+    def _dedupe_identical_rows(rows: list[Transaction]) -> list[Transaction]:
+        seen: set[str] = set()
+        unique: list[Transaction] = []
+        for txn in rows:
+            sig = GestionalePool._normalize_identifier(
+                f"{txn.identificativo}|{txn.date}|{txn.amount}|{txn.description}"
+            )
+            if sig in seen:
                 continue
-            candidates = [
-                txn
-                for txn in self._all
-                if self._normalize_identifier(txn.identificativo) == target
-            ]
-            if not candidates:
-                continue
-            within = [
-                txn
-                for txn in candidates
-                if self._amount_within_tolerance(
-                    card_amount, txn.amount, amount_tolerance_pct
-                )
-            ]
-            if not within:
-                continue
-            best = min(within, key=lambda txn: abs(txn.amount - card_amount))
-            if best not in found:
-                found.append(best)
-        return found
+            seen.add(sig)
+            unique.append(txn)
+        return unique
 
     @staticmethod
     def _amount_within_tolerance(
