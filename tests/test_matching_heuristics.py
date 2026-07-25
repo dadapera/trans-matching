@@ -114,6 +114,112 @@ def test_identical_siap_clone_rows_do_not_double_amount_gate() -> None:
     assert reason is None
 
 
+def test_gate_rejects_distinct_guests_without_shared_low_cost() -> None:
+    card = _txn(
+        amount="303.72",
+        description="AMBASSADEUR HOTEL CHERBOURG-EN-CO",
+    )
+    spahiu = _txn(
+        identificativo="998 26 96",
+        amount="303.72",
+        description="317 HOTEL AMBASSADE SPAHIU JONATHAN",
+    )
+    pastore = _txn(
+        identificativo="998 26 97",
+        amount="303.72",
+        description="317 HOTEL AMBASSADE PASTORE MARCO",
+    )
+    pool = GestionalePool([spahiu, pastore])
+
+    matched, resolved, confidence, reason = apply_confidence_gate(
+        card=card,
+        confidence="alto",
+        identificativi=["998 26 96", "998 26 97"],
+        alternatives=[],
+        pool=pool,
+        card_row_number=36,
+    )
+
+    assert matched is False
+    assert resolved == []
+    assert confidence == "basso"
+    assert reason is not None and "ospiti gestionale distinti" in reason
+
+
+def test_gate_allows_distinct_guests_with_shared_low_cost() -> None:
+    card = _txn(
+        amount="956.80",
+        description=(
+            "JET2.COM NUM.BIGLIETTO 7980109101951 "
+            "NOME PASSEGGERO MR ED0ARD0 MARCANTONI"
+        ),
+    )
+    edoardo = _txn(
+        identificativo="BAW 2434",
+        amount="478.40",
+        description="JT2 JET2            MARCANTONI/EDOARDO",
+        raw="BAW 2434 ... N   336KBS",
+    )
+    rossano = _txn(
+        identificativo="BAW 2435",
+        amount="478.40",
+        description="JT2 JET2            MARCANTONI/ROSSANO",
+        raw="BAW 2435 ... N   336KBS",
+    )
+    pool = GestionalePool([edoardo, rossano])
+
+    matched, resolved, confidence, reason = apply_confidence_gate(
+        card=card,
+        confidence="alto",
+        identificativi=["BAW 2434", "BAW 2435"],
+        alternatives=[],
+        pool=pool,
+        card_row_number=29,
+    )
+
+    assert matched is True
+    assert {txn.identificativo for txn in resolved} == {"BAW 2434", "BAW 2435"}
+    assert confidence == "alto"
+    assert reason is None
+
+
+def test_low_cost_amount_group_sums_same_ticket_passengers() -> None:
+    from trans_matching.parsers.amex import extract_amex_passenger_name
+
+    assert extract_amex_passenger_name(
+        "NOME PASSEGGERO MR ED0ARD0 MARCANTONI A: U2"
+    ) == "MR ED0ARD0 MARCANTONI"
+
+    edoardo = _txn(
+        identificativo="BAW 2434",
+        date="0/00/00",
+        amount="478.40",
+        description="JT2 JET2            MARCANTONI/EDOARDO",
+        raw=(
+            "BAW            2434 20 1 1   4361   0/00/00            478,40  "
+            "JT2 JET2            MARCANTONI/EDOARDO                      0,00   0/00/00 N   336KBS"
+        ),
+    )
+    rossano = _txn(
+        identificativo="BAW 2435",
+        date="0/00/00",
+        amount="478.40",
+        description="JT2 JET2            MARCANTONI/ROSSANO",
+        raw=(
+            "BAW            2435 20 1 1   4361   0/00/00            478,40  "
+            "JT2 JET2            MARCANTONI/ROSSANO                      0,00   0/00/00 N   336KBS"
+        ),
+    )
+    pool = GestionalePool([edoardo, rossano, _txn(identificativo="OTHER", amount="10")])
+
+    group = pool.find_low_cost_amount_group(
+        card_amount=Decimal("956.80"),
+        ticket="7980109101951",
+        passenger_name="MR ED0ARD0 MARCANTONI",
+    )
+    assert {txn.identificativo for txn in group} == {"BAW 2434", "BAW 2435"}
+
+
 def test_confidence_gate_rejects_large_amount_delta() -> None:
     card = _txn(amount="100.00")
     gestionale = _txn(identificativo="BAW 2507 20", amount="200.42")

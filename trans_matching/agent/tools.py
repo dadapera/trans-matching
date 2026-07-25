@@ -14,8 +14,12 @@ from trans_matching.agent.dates import date_window_bounds
 from trans_matching.agent.sum_check import find_amount_combinations, find_document_amount_groups
 from trans_matching.config import get_agent_log_config, get_msc_email_config
 from trans_matching.matchers.agent_models import AgentMatchResult, Confidence, MatchAlternative
-from trans_matching.matchers.gestionale_text import normalize_text
-from trans_matching.parsers.gestionale import format_siap_match_label
+from trans_matching.matchers.gestionale_text import (
+    normalize_guest_parts,
+    normalize_text,
+    split_gestionale_description,
+)
+from trans_matching.parsers.gestionale import extract_siap_low_cost, format_siap_match_label
 from trans_matching.models import Transaction
 from trans_matching.email.models import EmailSearchQuery
 from trans_matching.verifiers.expedia_parser import format_llm_email_text, parse_expedia_email
@@ -458,6 +462,10 @@ def apply_confidence_gate(
     if not resolved:
         return False, [], "basso", "identificativi non risolti o ambigui"
 
+    guest_reason = _guest_conflict_gate_reason(resolved)
+    if guest_reason is not None:
+        return False, [], "basso", guest_reason
+
     amount_reason = _amount_gate_reason(card, resolved)
     if amount_reason is not None:
         return False, [], "basso", amount_reason
@@ -467,6 +475,36 @@ def apply_confidence_gate(
         return False, [], "basso", merchant_reason
 
     return True, resolved, confidence, None
+
+
+def _guest_conflict_gate_reason(gestionale: list[Transaction]) -> str | None:
+    """Blocca multi-riga con ospiti distinti, salvo stesso LowCost (es. 2 pax stesso ticket)."""
+    if len(gestionale) < 2:
+        return None
+
+    guest_sets: list[frozenset[str]] = []
+    for txn in gestionale:
+        _, guest = split_gestionale_description(txn.description)
+        if not guest:
+            continue
+        parts = normalize_guest_parts(guest)
+        if len(parts) < 2:
+            continue
+        if parts not in guest_sets:
+            guest_sets.append(parts)
+
+    if len(guest_sets) < 2:
+        return None
+
+    low_costs = {
+        code
+        for txn in gestionale
+        if (code := extract_siap_low_cost(txn.raw))
+    }
+    if len(low_costs) == 1:
+        return None
+
+    return "ospiti gestionale distinti nello stesso match"
 
 
 def build_result_from_output(

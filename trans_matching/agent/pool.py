@@ -224,6 +224,81 @@ class GestionalePool:
             if extract_siap_low_cost(txn.raw) == normalized
         ]
 
+    def find_low_cost_amount_group(
+        self,
+        *,
+        card_amount: Decimal,
+        ticket: str = "",
+        passenger_name: str = "",
+        amount_tolerance_pct: float = 50.0,
+    ) -> list[Transaction]:
+        """Righe con stesso LowCost la cui somma copre l'importo carta.
+
+        Usa il ticket Amex se presente; altrimenti raggruppa per LowCost le
+        righe il cui ospite condivide un cognome con NOME PASSEGGERO Amex
+        (es. due pax Jet2 stesso codice SIAP, ticket Amex diverso).
+        """
+        from collections import defaultdict
+
+        from trans_matching.matchers.gestionale_text import normalize_text
+        from trans_matching.parsers.gestionale import normalize_ticket_code
+
+        def same_sign(rows: list[Transaction]) -> list[Transaction]:
+            if card_amount > 0:
+                return [txn for txn in rows if txn.amount > 0]
+            if card_amount < 0:
+                return [txn for txn in rows if txn.amount < 0]
+            return list(rows)
+
+        def amount_ok(rows: list[Transaction]) -> bool:
+            if not rows:
+                return False
+            total = sum((txn.amount for txn in rows), Decimal("0"))
+            return self._amount_within_tolerance(
+                card_amount, total, amount_tolerance_pct
+            )
+
+        normalized_ticket = normalize_ticket_code(ticket) if ticket else ""
+        if normalized_ticket:
+            hits = self._dedupe_identical_rows(
+                same_sign(self.find_by_low_cost(normalized_ticket))
+            )
+            if len(hits) >= 2 and amount_ok(hits):
+                return hits
+            if len(hits) == 1 and amount_ok(hits):
+                return hits
+
+        name_tokens = {
+            token
+            for token in normalize_text(passenger_name).replace("/", " ").split()
+            if len(token) >= 4
+        }
+        if not name_tokens:
+            return []
+
+        by_code: dict[str, list[Transaction]] = defaultdict(list)
+        for txn in self._all:
+            code = extract_siap_low_cost(txn.raw)
+            if not code:
+                continue
+            desc = normalize_text(txn.description)
+            if not any(token in desc for token in name_tokens):
+                continue
+            by_code[code].append(txn)
+
+        best: list[Transaction] = []
+        best_delta = float("inf")
+        for rows in by_code.values():
+            group = self._dedupe_identical_rows(same_sign(rows))
+            if len(group) < 2 or not amount_ok(group):
+                continue
+            total = sum((txn.amount for txn in group), Decimal("0"))
+            delta = abs(float(total - card_amount))
+            if delta < best_delta:
+                best_delta = delta
+                best = group
+        return best
+
     def search(
         self,
         *,

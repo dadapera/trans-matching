@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from decimal import Decimal
 from typing import Literal
 
 from langchain.agents import create_agent
@@ -28,7 +29,11 @@ from trans_matching.openai_http import (
     build_openai_async_http_client,
     build_openai_http_client,
 )
-from trans_matching.parsers.amex import extract_amex_ticket_number
+from trans_matching.parsers.amex import (
+    extract_amex_passenger_name,
+    extract_amex_ticket_number,
+)
+from trans_matching.parsers.gestionale import extract_siap_low_cost
 
 _MATCHING_AGENT = None
 
@@ -68,10 +73,13 @@ Workflow consigliato:
    Parti dai candidati nel contesto Auto Europe; affina con importo, data e nome passeggero (COGNOME/NOME in descrizione).
 4. Se nei dettagli Amex compare NUM.BIGLIETTO (voli low cost: Ryanair, EasyJet, Wizz, Vueling, …) → confrontalo con il campo LowCost: delle righe SIAP (colonna Low Cost del gestionale).
    Un codice biglietto uguale (ignorando spazi) è evidenza FORTE di match; preferiscilo a solo importo/data.
+   Se più righe SIAP condividono lo stesso LowCost: e la somma copre l'importo carta (es. due passeggeri), restituisci tutti quegli identificativi.
 5. Se l'importo potrebbe essere suddiviso su più righe dello stesso Documento+Codice Cliente → usa check_document_group_sum.
 6. Se resta una somma multi-riga non coperta dal documento → usa check_sum.
 7. Per casi generici → interpreta direttamente le righe gestionale in context, usando codici fornitore e COGNOME/NOME nelle descrizioni SIAP.
 8. Prima di concludere con importi diversi → compare_amount.
+
+VIETATO: restituire più identificativi con ospiti/passeggeri SIAP chiaramente diversi, salvo se condividono lo stesso LowCost: e la somma copre la carta.
 
 Regole confidenza:
 - "alto": match univoco e coerente (ospite/fornitore/data/importo). Per Expedia l'ospite deve essere lo stesso a tuo giudizio (anche se troncato o invertito). Per low cost, NUM.BIGLIETTO = LowCost è sufficiente per alto se non ci sono conflitti.
@@ -179,6 +187,18 @@ def match_one(session: MatchSession) -> AgentMatchResult:
         auto_europe_context = (
             collect_auto_europe_context(session) if category == "auto_europe" else None
         )
+
+        low_cost_match = _try_low_cost_group_match(session)
+        if low_cost_match is not None:
+            session.logger.log(
+                "txn_end",
+                trace_id=session.trace_id,
+                matched=low_cost_match.matched,
+                confidence=low_cost_match.confidence,
+                duration_ms=int((time.perf_counter() - started) * 1000),
+            )
+            return low_cost_match
+
         user_prompt = _format_user_prompt(
             session,
             category,
@@ -269,6 +289,41 @@ def match_one(session: MatchSession) -> AgentMatchResult:
         )
     finally:
         reset_session(token)
+
+
+def _try_low_cost_group_match(session: MatchSession) -> AgentMatchResult | None:
+    """Match deterministico se più righe SIAP con stesso LowCost sommano l'importo carta."""
+    ticket = extract_amex_ticket_number(session.card.description)
+    passenger = extract_amex_passenger_name(session.card.description)
+    if not ticket and not passenger:
+        return None
+
+    group = session.pool.find_low_cost_amount_group(
+        card_amount=session.card.amount,
+        ticket=ticket,
+        passenger_name=passenger,
+        amount_tolerance_pct=50.0,
+    )
+    if len(group) < 2:
+        return None
+
+    low_cost = extract_siap_low_cost(group[0].raw) or ticket
+    ids = [session.pool.row_reference(txn) for txn in group]
+    total = sum((txn.amount for txn in group), Decimal("0"))
+    return build_result_from_output(
+        card=session.card,
+        trace_id=session.trace_id,
+        row_number=session.row_number,
+        strategy="sum",
+        identificativi=ids,
+        confidence="alto",
+        reason=(
+            f"Somma multi-voce LowCost:{low_cost}: "
+            f"{len(group)} righe SIAP = {total} (carta {session.card.amount})."
+        ),
+        alternatives=[],
+        pool=session.pool,
+    )
 
 
 def _collect_low_cost_context(session: MatchSession) -> dict | None:
