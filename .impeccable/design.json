@@ -1,0 +1,261 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-25T23:30:00.000Z",
+  "title": "Design System: Trans Matching",
+  "extensions": {
+    "colorMeta": {
+      "bg": {
+        "role": "neutral",
+        "displayName": "Midnight Base",
+        "canonical": "#0f1117",
+        "tonalRamp": ["#050608", "#0a0c10", "#0f1117", "#151820", "#1a1e28", "#222733", "#2a3040", "#3a4254"]
+      },
+      "bg-elevated": {
+        "role": "neutral",
+        "displayName": "Elevated Slate",
+        "canonical": "#171b26",
+        "tonalRamp": ["#080a0f", "#0e1118", "#171b26", "#1d2230", "#242a3a", "#2c3346", "#353d52", "#404a62"]
+      },
+      "bg-panel": {
+        "role": "neutral",
+        "displayName": "Panel Slate",
+        "canonical": "#1c2230",
+        "tonalRamp": ["#090b10", "#11151e", "#1c2230", "#222938", "#293142", "#313a4e", "#3a445a", "#444f68"]
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "Steel Border",
+        "canonical": "#2a3344",
+        "tonalRamp": ["#11151c", "#181e28", "#2a3344", "#323d50", "#3b475c", "#455268", "#505f78", "#5c6d88"]
+      },
+      "text": {
+        "role": "neutral",
+        "displayName": "Cloud Text",
+        "canonical": "#e8ecf4",
+        "tonalRamp": ["#3a3f4a", "#5a6170", "#7a8394", "#9aa3b4", "#b8c0ce", "#d0d6e2", "#e8ecf4", "#f4f6fa"]
+      },
+      "text-muted": {
+        "role": "neutral",
+        "displayName": "Ash Muted",
+        "canonical": "#8b95a8",
+        "tonalRamp": ["#2a2e36", "#3d4350", "#505868", "#636d7e", "#768094", "#8b95a8", "#a3acbc", "#bcc3d0"]
+      },
+      "accent": {
+        "role": "primary",
+        "displayName": "Signal Blue",
+        "canonical": "#5b8def",
+        "tonalRamp": ["#0f1f3d", "#1a3260", "#2a4f8f", "#3d6bb8", "#4d7ed8", "#5b8def", "#7aa3f5", "#a8c4fa"]
+      },
+      "accent-hover": {
+        "role": "primary",
+        "displayName": "Signal Blue Hover",
+        "canonical": "#7aa3f5",
+        "tonalRamp": ["#152a4d", "#254070", "#355a94", "#4a74b8", "#5f8dd8", "#7aa3f5", "#95b5f8", "#b5cbfb"]
+      },
+      "success": {
+        "role": "semantic",
+        "displayName": "Match Green",
+        "canonical": "#3ecf8e",
+        "tonalRamp": ["#0a2e1e", "#124a30", "#1a6644", "#22825a", "#2a9e70", "#3ecf8e", "#5dd9a4", "#8ee6bf"]
+      },
+      "warning": {
+        "role": "semantic",
+        "displayName": "Caution Amber",
+        "canonical": "#f0b429",
+        "tonalRamp": ["#3d2e08", "#5c450c", "#7a5c10", "#997314", "#b88a18", "#f0b429", "#f4c555", "#f8d882"]
+      },
+      "danger": {
+        "role": "semantic",
+        "displayName": "Alert Coral",
+        "canonical": "#f07178",
+        "tonalRamp": ["#3d1518", "#5c2024", "#7a2b30", "#99363c", "#b84148", "#f07178", "#f48d92", "#f8b0b4"]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "App title in header only."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Trace card headings and emphasized metadata."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Default UI text, buttons, tabs, and feed copy."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Uppercase panel section titles and table headers."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "Run IDs, trace IDs, SIAP codes, and debug output."
+      }
+    },
+    "shadows": [
+      {
+        "name": "trace-card",
+        "value": "0 10px 30px rgba(0, 0, 0, 0.12)",
+        "purpose": "Ambient lift on trace cards in the live feed — the only structural shadow in the system."
+      },
+      {
+        "name": "accent-ring",
+        "value": "0 0 0 1px #5b8def",
+        "purpose": "Active state ring on report stat filter chips."
+      }
+    ],
+    "motion": [
+      {
+        "name": "transition-fast",
+        "value": "0.15s ease",
+        "purpose": "Default for background, border-color, and opacity on buttons, dropzones, and panels."
+      },
+      {
+        "name": "progress-fill",
+        "value": "0.3s ease",
+        "purpose": "Progress bar width transitions during run execution."
+      },
+      {
+        "name": "btn-spin",
+        "value": "0.8s linear infinite",
+        "purpose": "Loader spinner on running status badges and loading buttons."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "stack",
+        "value": "900px",
+        "purpose": "Sidebar + main grid collapses to single column."
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Main call to action — upload confirm, start run.",
+      "html": "<button class=\"ds-btn-primary\" type=\"button\">Avvia</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; padding: 0.55rem 1rem; border: none; border-radius: 8px; background: #5b8def; color: #fff; font-family: \"DM Sans\", system-ui, sans-serif; font-size: 0.9rem; font-weight: 500; cursor: pointer; transition: background 0.15s ease; } .ds-btn-primary:hover { background: #7aa3f5; } .ds-btn-primary:focus-visible { outline: 2px solid #7aa3f5; outline-offset: 2px; } .ds-btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }"
+    },
+    {
+      "name": "Danger Button",
+      "kind": "button",
+      "refersTo": "button-danger",
+      "description": "Destructive or stop action — translucent coral, never solid red.",
+      "html": "<button class=\"ds-btn-danger\" type=\"button\">Stop</button>",
+      "css": ".ds-btn-danger { display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; padding: 0.55rem 1rem; border-radius: 8px; border: 1px solid rgba(240, 113, 120, 0.35); background: rgba(240, 113, 120, 0.15); color: #f07178; font-family: \"DM Sans\", system-ui, sans-serif; font-size: 0.9rem; font-weight: 500; cursor: pointer; transition: background 0.15s ease; } .ds-btn-danger:hover { background: rgba(240, 113, 120, 0.25); } .ds-btn-danger:focus-visible { outline: 2px solid #f07178; outline-offset: 2px; } .ds-btn-danger:disabled { opacity: 0.45; cursor: not-allowed; }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Secondary actions such as export; bordered, transparent fill.",
+      "html": "<button class=\"ds-btn-ghost\" type=\"button\">Esporta</button>",
+      "css": ".ds-btn-ghost { display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; padding: 0.55rem 1rem; border-radius: 8px; border: 1px solid #2a3344; background: transparent; color: #e8ecf4; font-family: \"DM Sans\", system-ui, sans-serif; font-size: 0.9rem; font-weight: 500; cursor: pointer; transition: background 0.15s ease, border-color 0.15s ease; } .ds-btn-ghost:hover { background: rgba(91, 141, 239, 0.08); border-color: #5b8def; } .ds-btn-ghost:focus-visible { outline: 2px solid #5b8def; outline-offset: 2px; }"
+    },
+    {
+      "name": "Panel",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "Sidebar section container for upload, controls, and history.",
+      "html": "<section class=\"ds-panel\"><h2 class=\"ds-panel__label\">Documenti</h2><p class=\"ds-panel__body\">Trascina o clicca per caricare i file.</p></section>",
+      "css": ".ds-panel { background: #1c2230; border: 1px solid #2a3344; border-radius: 10px; padding: 1rem; color: #e8ecf4; font-family: \"DM Sans\", system-ui, sans-serif; } .ds-panel__label { margin: 0 0 0.75rem; font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #8b95a8; } .ds-panel__body { margin: 0; font-size: 0.9rem; color: #8b95a8; line-height: 1.5; }"
+    },
+    {
+      "name": "Status Badge",
+      "kind": "chip",
+      "refersTo": "status-badge-running",
+      "description": "Pill badge for run state — running, completed, error, etc.",
+      "html": "<span class=\"ds-status-badge ds-status-badge--running\">In esecuzione</span>",
+      "css": ".ds-status-badge { display: inline-flex; align-items: center; gap: 0.35rem; font-family: \"DM Sans\", system-ui, sans-serif; font-size: 0.75rem; font-weight: 600; padding: 0.2rem 0.55rem; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.04em; } .ds-status-badge--running { background: rgba(91, 141, 239, 0.2); color: #5b8def; } .ds-status-badge--completed { background: rgba(62, 207, 142, 0.2); color: #3ecf8e; } .ds-status-badge--error { background: rgba(240, 113, 120, 0.2); color: #f07178; }"
+    },
+    {
+      "name": "Dropzone",
+      "kind": "input",
+      "refersTo": "dropzone",
+      "description": "File upload target — dashed border, accent on hover/drag.",
+      "html": "<div class=\"ds-dropzone\" role=\"button\" tabindex=\"0\"><span class=\"ds-dropzone__label\">Transazioni carta (CSV o PDF)</span><span class=\"ds-dropzone__hint\">Trascina o clicca</span></div>",
+      "css": ".ds-dropzone { border: 1px dashed #2a3344; border-radius: 8px; padding: 0.85rem; cursor: pointer; display: flex; flex-direction: column; gap: 0.35rem; transition: border-color 0.15s ease, background 0.15s ease; font-family: \"DM Sans\", system-ui, sans-serif; } .ds-dropzone:hover { border-color: #5b8def; background: rgba(91, 141, 239, 0.06); } .ds-dropzone__label { font-weight: 500; font-size: 0.9rem; color: #e8ecf4; } .ds-dropzone__hint { font-size: 0.8rem; color: #8b95a8; }"
+    },
+    {
+      "name": "Tab Navigation",
+      "kind": "nav",
+      "refersTo": "tab-active",
+      "description": "Main content tabs — live feed vs report.",
+      "html": "<nav class=\"ds-tabs\"><button class=\"ds-tab ds-tab--active\" type=\"button\">Attività live</button><button class=\"ds-tab\" type=\"button\">Report (12)</button></nav>",
+      "css": ".ds-tabs { display: flex; border-bottom: 1px solid #2a3344; background: #171b26; padding: 0 1rem; } .ds-tab { padding: 0.85rem 1.1rem; background: none; border: none; border-bottom: 2px solid transparent; color: #8b95a8; font-family: \"DM Sans\", system-ui, sans-serif; font-size: 0.9rem; font-weight: 500; cursor: pointer; margin-bottom: -1px; transition: color 0.15s ease, border-color 0.15s ease; } .ds-tab:hover { color: #e8ecf4; } .ds-tab--active { color: #e8ecf4; border-bottom-color: #5b8def; } .ds-tab:focus-visible { outline: 2px solid #5b8def; outline-offset: -2px; }"
+    },
+    {
+      "name": "Trace Card",
+      "kind": "custom",
+      "refersTo": "trace-card-matched",
+      "description": "Signature live-feed card for a single transaction trace — left semantic edge + optional shadow.",
+      "html": "<article class=\"ds-trace-card ds-trace-card--matched\"><header class=\"ds-trace-card__header\"><div><span class=\"ds-trace-card__eyebrow\">Riga 42</span><h3>EG*TRVL73369686036204</h3></div><span class=\"ds-trace-status\">Match</span></header><p class=\"ds-trace-card__reason\">Ospite confermato via email Expedia.</p></article>",
+      "css": ".ds-trace-card { background: #1c2230; border: 1px solid #2a3344; border-radius: 10px; padding: 0.95rem; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12); font-family: \"DM Sans\", system-ui, sans-serif; color: #e8ecf4; } .ds-trace-card--matched { border-left: 3px solid #3ecf8e; } .ds-trace-card:hover { border-color: rgba(91, 141, 239, 0.55); } .ds-trace-card__eyebrow { font-size: 0.75rem; color: #8b95a8; } .ds-trace-card h3 { margin: 0.2rem 0 0; font-size: 1rem; font-weight: 600; } .ds-trace-card__reason { margin: 0.5rem 0 0; font-size: 0.85rem; color: #8b95a8; } .ds-trace-status { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; border-radius: 999px; padding: 0.25rem 0.55rem; background: rgba(62, 207, 142, 0.15); color: #3ecf8e; }"
+    },
+    {
+      "name": "Progress Bar",
+      "kind": "custom",
+      "refersTo": "progress-bar",
+      "description": "Run and upload progress — 6px pill track with accent gradient fill.",
+      "html": "<div class=\"ds-progress\"><div class=\"ds-progress__meta\"><span>24 / 100 transazioni</span><span>18 match</span></div><div class=\"ds-progress__track\"><div class=\"ds-progress__fill\" style=\"width: 24%;\"></div></div></div>",
+      "css": ".ds-progress__meta { display: flex; justify-content: space-between; font-size: 0.8rem; color: #8b95a8; margin-bottom: 0.35rem; font-family: \"DM Sans\", system-ui, sans-serif; } .ds-progress__track { height: 6px; background: #2a3344; border-radius: 999px; overflow: hidden; } .ds-progress__fill { height: 100%; background: linear-gradient(90deg, #5b8def, #7aa3f5); border-radius: 999px; transition: width 0.3s ease; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Audit Console",
+    "overview": "Trans Matching reads as a calm, traceable control room for accounting reconciliation — not a marketing site, not a spreadsheet clone. The interface is dark, information-dense, and built for long sessions: an accountant uploads documents, watches live agent activity, and inspects match outcomes before posting. Visual energy stays low; status color and left-edge accents carry meaning when something needs attention.\n\nSurfaces stack in three tonal steps (page → header/tabs → panels) with hairline borders instead of heavy shadows. Interaction feedback is gentle — soft accent tints on hover, pill badges for run state, gradient progress fills — so high-volume review does not feel alarming. JetBrains Mono appears wherever identifiers, trace IDs, and SIAP codes need to scan.",
+    "keyCharacteristics": [
+      "Dark three-tier surface stack with border-defined depth, not shadow-defined depth",
+      "Signal Blue accent reserved for primary actions, active tabs, and in-progress state",
+      "Semantic status palette (green / amber / red / muted) applied consistently across badges, table rows, and trace cards",
+      "Uppercase micro-labels for panel sections and table headers; sentence case for body and controls",
+      "Sidebar + main split layout optimized for Operate mode: controls left, live feed and report right",
+      "Italian copy throughout; monospace for machine-readable values"
+    ],
+    "rules": [
+      {
+        "name": "The Semantic Edge Rule",
+        "body": "Match outcome is communicated with a 3px left border on trace cards and tinted table row backgrounds — never by recoloring the entire card background.",
+        "section": "colors"
+      },
+      {
+        "name": "The Accent Sparingly Rule",
+        "body": "Signal Blue marks interactive focus and progress. It does not decorate static content; if nothing is actionable, the screen should read mostly neutral.",
+        "section": "colors"
+      },
+      {
+        "name": "The Panel Label Rule",
+        "body": "Section titles inside panels are always uppercase micro-labels in Ash Muted — they label regions, they do not compete with content.",
+        "section": "typography"
+      },
+      {
+        "name": "The Mono for Machines Rule",
+        "body": "Any value that might be pasted into SIAP or searched in logs uses JetBrains Mono; prose reasoning stays in DM Sans.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat-By-Default Rule",
+        "body": "Surfaces are flat at rest. The trace card shadow is the sole structural lift; everything else uses tone and border.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do use the three-tier surface stack (#0f1117 / #171b26 / #1c2230) for page, chrome, and content panels.",
+      "Do communicate match outcomes through left-edge accents and subtle row tints, not full-card background floods.",
+      "Do keep primary actions in Signal Blue; reserve green/amber/red for semantic status only.",
+      "Do use uppercase 0.8rem labels for panel sections and table headers.",
+      "Do use JetBrains Mono for run IDs, trace IDs, SIAP identificativi, and debug output.",
+      "Do keep transitions at ~150ms for hover/focus; prefer border and background shifts over scale or shadow."
+    ],
+    "donts": [
+      "Don't add shadows to panels, sidebar items, or buttons — trace cards are the only lifted surface.",
+      "Don't use solid saturated red or green button fills; danger is always translucent coral.",
+      "Don't introduce a second accent hue; Signal Blue is the sole interactive color.",
+      "Don't switch to a light theme without an explicit redesign — the incumbent system is dark-only.",
+      "Don't use decorative illustration or marketing hero patterns; this is Operate-mode tooling."
+    ]
+  }
+}
