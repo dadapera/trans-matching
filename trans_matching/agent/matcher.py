@@ -84,6 +84,9 @@ Se non c'è evidenza sufficiente, lascia identificativi vuoti e confidence basso
 
 Formati gestionale: identificativo|data|importo|descrizione|LowCost:CODICE  [available]
 (LowCost è presente solo se valorizzato in SIAP.)
+Nel campo identificativi: copia solo l'identificativo (es. "998 26 100", "LOW 8573", "PRT 26 142").
+Se lo stesso codice compare su più righe, usa il formato completo identificativo|data|importo|descrizione.
+Non includere [available], parentesi o LowCost: nel campo identificativi.
 Puoi riusare la stessa pratica/riga SIAP su più transazioni quando l'evidenza lo giustifica; l'ambiguità sarà evidenziata nel report per revisione umana."""
 
 

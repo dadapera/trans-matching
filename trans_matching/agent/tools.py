@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import gc
 import json
+import re
 import time
 from datetime import timedelta
 from decimal import Decimal
@@ -445,7 +446,15 @@ def apply_confidence_gate(
     if confidence not in ("alto", "medio") or not identificativi:
         return False, [], confidence if confidence == "basso" else "basso", None
 
-    resolved = pool.find_by_identificativi(identificativi)
+    cleaned_ids = clean_identificativi(identificativi)
+    if not cleaned_ids:
+        return False, [], "basso", None
+
+    resolved = pool.find_by_identificativi(
+        cleaned_ids,
+        card_amount=card.amount,
+        amount_tolerance_pct=_amount_gate_threshold_pct(card),
+    )
     if not resolved:
         return False, [], "basso", "identificativi non risolti o ambigui"
 
@@ -501,6 +510,21 @@ def build_result_from_output(
     )
 
 
+_AMOUNT_GATE_THRESHOLD_PCT = 50.0
+
+
+def _is_expedia_card(card: Transaction) -> bool:
+    text = normalize_text(card.description)
+    return "EG*TRVL" in text or "EG TRVL" in text
+
+
+def _amount_gate_threshold_pct(card: Transaction) -> float:
+    # Expedia: ospite primario; importo non blocca il match (solo segno).
+    if _is_expedia_card(card):
+        return 1000.0
+    return _AMOUNT_GATE_THRESHOLD_PCT
+
+
 def _amount_gate_reason(card: Transaction, gestionale: list[Transaction]) -> str | None:
     total = sum((txn.amount for txn in gestionale), Decimal("0"))
     if card.amount == 0:
@@ -509,9 +533,16 @@ def _amount_gate_reason(card: Transaction, gestionale: list[Transaction]) -> str
     if (card.amount > 0 and total <= 0) or (card.amount < 0 and total >= 0):
         return f"segno importo incoerente: carta {card.amount}, gestionale {total}"
 
+    # Expedia: ospite è criterio primario; non bloccare su scostamento importo.
+    if _is_expedia_card(card):
+        return None
+
     delta_pct = abs(float((total - card.amount) / card.amount * 100))
-    if delta_pct > 15:
-        return f"scostamento importo {delta_pct:.2f}% oltre soglia 15%"
+    if delta_pct > _AMOUNT_GATE_THRESHOLD_PCT:
+        return (
+            f"scostamento importo {delta_pct:.2f}% "
+            f"oltre soglia {int(_AMOUNT_GATE_THRESHOLD_PCT)}%"
+        )
 
     return None
 
@@ -535,8 +566,7 @@ _EXPEDIA_INCOMPATIBLE_TOKENS = {
 
 
 def _merchant_gate_reason(card: Transaction, gestionale: list[Transaction]) -> str | None:
-    card_text = normalize_text(card.description)
-    if "EG*TRVL" not in card_text and "EG TRVL" not in card_text:
+    if not _is_expedia_card(card):
         return None
 
     incompatible_rows = [
@@ -559,7 +589,7 @@ def _is_expedia_incompatible_row(txn: Transaction) -> bool:
 
 
 def preview_for_identificativi(pool, identificativi: list[str]) -> str:
-    cleaned = [value.strip() for value in identificativi if value.strip()]
+    cleaned = clean_identificativi(identificativi)
     if not cleaned:
         return ""
     rows = pool.find_by_identificativi(cleaned)
@@ -574,4 +604,21 @@ def preview_for_identificativi(pool, identificativi: list[str]) -> str:
 
 
 def clean_identificativi(identificativi: list[str]) -> list[str]:
-    return [value.strip() for value in identificativi if value.strip()]
+    """Normalizza ID restituiti dall'LLM (parentesi, [available], importi IT)."""
+    cleaned: list[str] = []
+    for raw in identificativi:
+        value = (raw or "").strip()
+        if not value:
+            continue
+        value = re.sub(r"\s*\[available\]\s*$", "", value, flags=re.IGNORECASE)
+        value = re.sub(r"\|LowCost:[^|\s]+", "", value, flags=re.IGNORECASE)
+        if value.startswith("[") and value.endswith("]") and "|" not in value:
+            value = value[1:-1].strip()
+        parts = [part.strip() for part in value.split("|")]
+        if len(parts) >= 3:
+            amount = parts[2].replace(" ", "").replace("€", "").replace(",", ".")
+            parts[2] = amount
+            value = "|".join(parts)
+        if value:
+            cleaned.append(value)
+    return cleaned

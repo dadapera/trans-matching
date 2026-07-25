@@ -53,8 +53,23 @@ def test_duplicate_gestionale_identifier_alone_is_ambiguous() -> None:
     ) == [first]
 
 
+def test_duplicate_identifier_disambiguated_by_card_amount() -> None:
+    first = _txn(identificativo="PRT 26 483", amount="842.00")
+    second = _txn(identificativo="PRT 26 483", amount="1034.00")
+    pool = GestionalePool([first, second])
+
+    assert pool.find_by_identificativi(
+        ["PRT 26 483"],
+        card_amount=Decimal("840.00"),
+    ) == [first]
+    assert pool.find_by_identificativi(
+        ["PRT 26 483"],
+        card_amount=Decimal("1030.00"),
+    ) == [second]
+
+
 def test_confidence_gate_rejects_large_amount_delta() -> None:
-    card = _txn(amount="354.72")
+    card = _txn(amount="100.00")
     gestionale = _txn(identificativo="BAW 2507 20", amount="200.42")
     pool = GestionalePool([gestionale])
 
@@ -71,6 +86,95 @@ def test_confidence_gate_rejects_large_amount_delta() -> None:
     assert resolved == []
     assert confidence == "basso"
     assert reason is not None and "scostamento importo" in reason
+    assert "50%" in reason
+
+
+def test_confidence_gate_allows_amount_delta_under_50_pct() -> None:
+    card = _txn(amount="112.67")
+    gestionale = _txn(identificativo="LOW 8580", amount="130.00")
+    pool = GestionalePool([gestionale])
+
+    matched, resolved, confidence, reason = apply_confidence_gate(
+        card=card,
+        confidence="alto",
+        identificativi=["LOW 8580"],
+        alternatives=[],
+        pool=pool,
+        card_row_number=1,
+    )
+
+    assert matched is True
+    assert resolved == [gestionale]
+    assert confidence == "alto"
+    assert reason is None
+
+
+def test_expedia_gate_skips_amount_delta_when_guest_row_ok() -> None:
+    card = _txn(
+        amount="219.14",
+        description="EG*TRVL73372502204089 0269430760",
+    )
+    hotel = _txn(
+        identificativo="998 26 100",
+        amount="385.00",
+        description="094 IBIS PARIS COEUR SPAHIU JONATHAN",
+    )
+    pool = GestionalePool([hotel])
+
+    matched, resolved, confidence, reason = apply_confidence_gate(
+        card=card,
+        confidence="alto",
+        identificativi=["998 26 100"],
+        alternatives=[],
+        pool=pool,
+        card_row_number=1,
+    )
+
+    assert matched is True
+    assert resolved == [hotel]
+    assert confidence == "alto"
+    assert reason is None
+
+
+def test_clean_identificativi_strips_llm_noise() -> None:
+    from trans_matching.agent.tools import clean_identificativi
+
+    assert clean_identificativi(["[LOW 8573]"]) == ["LOW 8573"]
+    assert clean_identificativi(
+        ["PRT 26 142|22/06/2026|590,00|AUTO EUROPE|LowCost:ABC  [available]"]
+    ) == ["PRT 26 142|22/06/2026|590.00|AUTO EUROPE"]
+
+
+def test_gate_resolves_bracketed_and_duplicate_auto_europe_id() -> None:
+    card = _txn(
+        amount="587.95",
+        description="WWW.AUTOEUROPE.DEMUNICH UBICAZIONE",
+    )
+    auto_a = _txn(
+        identificativo="PRT 26 142",
+        amount="590.00",
+        description="AUTO EUROPE DEU DI PAOLO SIMONE",
+    )
+    auto_b = _txn(
+        identificativo="PRT 26 142",
+        amount="1200.00",
+        description="AUTO EUROPE DEU OTHER GUEST",
+    )
+    pool = GestionalePool([auto_a, auto_b])
+
+    matched, resolved, confidence, reason = apply_confidence_gate(
+        card=card,
+        confidence="alto",
+        identificativi=["[PRT 26 142]"],
+        alternatives=[],
+        pool=pool,
+        card_row_number=1,
+    )
+
+    assert matched is True
+    assert resolved == [auto_a]
+    assert confidence == "alto"
+    assert reason is None
 
 
 def test_check_sum_does_not_mix_unrelated_providers() -> None:

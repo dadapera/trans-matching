@@ -31,6 +31,30 @@ def _is_auth_failure(exc: BaseException) -> bool:
     return "AUTHENTICATIONFAILED" in text or "INVALID CREDENTIALS" in text
 
 
+_TRANSIENT_IMAP_MARKERS = (
+    "SOCKET ERROR",
+    "EOF",
+    "BROKEN PIPE",
+    "RESET BY PEER",
+    "TIMED OUT",
+    "TIMEOUT",
+    "CONNECTION REFUSED",
+    "CONNECTION RESET",
+)
+
+
+def _is_transient_imap_error(exc: BaseException) -> bool:
+    """True when disconnect + reconnect may fix the failure (stale Gmail session)."""
+    if isinstance(exc, (TimeoutError, BrokenPipeError, ConnectionResetError)):
+        return True
+    if isinstance(exc, (OSError, ssl.SSLError)):
+        return True
+    if isinstance(exc, imaplib.IMAP4.error):
+        text = str(exc).upper()
+        return any(marker in text for marker in _TRANSIENT_IMAP_MARKERS)
+    return False
+
+
 def _imap_ssl_error_message(exc: BaseException, config: EmailConfig) -> str:
     return (
         f"Impossibile raggiungere {config.imap_host}:{config.imap_port}: {exc}. "
@@ -176,7 +200,7 @@ class GmailReader:
         if self._mail is not None:
             try:
                 self._mail.logout()
-            except imaplib.IMAP4.error:
+            except (imaplib.IMAP4.error, OSError):
                 pass
             self._mail = None
 
@@ -187,16 +211,30 @@ class GmailReader:
         return self._mail
 
     def _run_imap(self, action):
-        try:
-            return action(self._ensure_connected())
-        except imaplib.IMAP4.error as exc:
-            if not _is_auth_failure(exc):
-                raise
-            self.disconnect()
+        for attempt in range(2):
             try:
                 return action(self._ensure_connected())
-            except imaplib.IMAP4.error as retry_exc:
-                raise RuntimeError(_imap_auth_error_message(retry_exc, self._config)) from retry_exc
+            except imaplib.IMAP4.error as exc:
+                if _is_auth_failure(exc):
+                    self.disconnect()
+                    if attempt == 0:
+                        try:
+                            return action(self._ensure_connected())
+                        except imaplib.IMAP4.error as retry_exc:
+                            raise RuntimeError(
+                                _imap_auth_error_message(retry_exc, self._config)
+                            ) from retry_exc
+                    raise RuntimeError(_imap_auth_error_message(exc, self._config)) from exc
+                if _is_transient_imap_error(exc) and attempt == 0:
+                    self.disconnect()
+                    continue
+                raise
+            except Exception as exc:
+                if _is_transient_imap_error(exc) and attempt == 0:
+                    self.disconnect()
+                    continue
+                raise
+        raise RuntimeError("Gmail IMAP: connessione persa dopo il retry")
 
     def search(self, query: EmailSearchQuery) -> list[EmailMessage]:
         return list(self.iter_search(query))
@@ -225,11 +263,7 @@ class GmailReader:
         fetch_query = _fetch_query(query)
         for uid in uids:
             def _fetch(mail: imaplib.IMAP4_SSL, uid=uid) -> EmailMessage | None:
-                try:
-                    status, fetched = mail.uid("fetch", uid, fetch_query)
-                except (TimeoutError, OSError):
-                    self.disconnect()
-                    return None
+                status, fetched = mail.uid("fetch", uid, fetch_query)
                 if status != "OK" or not fetched or not fetched[0]:
                     return None
                 raw = fetched[0][1]
@@ -264,11 +298,7 @@ class GmailReader:
         uid_bytes = uid.encode() if isinstance(uid, str) else uid
 
         def _fetch(mail: imaplib.IMAP4_SSL) -> EmailMessage | None:
-            try:
-                status, fetched = mail.uid("fetch", uid_bytes, fetch_query)
-            except (TimeoutError, OSError):
-                self.disconnect()
-                return None
+            status, fetched = mail.uid("fetch", uid_bytes, fetch_query)
             if status != "OK" or not fetched or not fetched[0]:
                 return None
             raw = fetched[0][1]

@@ -56,11 +56,18 @@ class GestionalePool:
         return " ".join(compact_pipes.upper().split())
 
     def _identifier_aliases(self, txn: Transaction) -> set[str]:
+        amount_variants = {
+            str(txn.amount),
+            f"{txn.amount:.2f}",
+            format(txn.amount.normalize(), "f"),
+        }
         aliases = {
             GestionalePool._row_signature(txn),
-            f"{txn.identificativo}|{txn.date}|{txn.amount}|{txn.description}",
             f"{txn.date}|{txn.description}|{txn.amount}",
         }
+        for amount in amount_variants:
+            aliases.add(f"{txn.identificativo}|{txn.date}|{amount}|{txn.description}")
+            aliases.add(f"{txn.date}|{txn.description}|{amount}")
         if txn.identificativo:
             normalized_identifier = self._normalize_identifier(txn.identificativo)
             if self._identifier_counts[normalized_identifier] == 1:
@@ -118,17 +125,70 @@ class GestionalePool:
     ) -> bool:
         return False
 
-    def find_by_identificativi(self, identificativi: list[str]) -> list[Transaction]:
+    def find_by_identificativi(
+        self,
+        identificativi: list[str],
+        *,
+        card_amount: Decimal | None = None,
+        amount_tolerance_pct: float = 50.0,
+    ) -> list[Transaction]:
         targets = {
             normalized
             for value in identificativi
             if (normalized := self._normalize_identifier(value))
         }
         found: list[Transaction] = []
+        matched_targets: set[str] = set()
         for txn in self._all:
-            if self._identifier_aliases(txn) & targets:
+            aliases = self._identifier_aliases(txn)
+            hit = aliases & targets
+            if hit:
                 found.append(txn)
+                matched_targets |= hit
+
+        unresolved = targets - matched_targets
+        if not unresolved or card_amount is None:
+            return found
+
+        # Short IDs that appear on multiple SIAP rows are omitted from aliases.
+        # Disambiguate with card amount so the gate does not drop an otherwise
+        # confident agent choice (Auto Europe, multi-row PRT/LOW, …).
+        for target in unresolved:
+            if "|" in target:
+                continue
+            candidates = [
+                txn
+                for txn in self._all
+                if self._normalize_identifier(txn.identificativo) == target
+            ]
+            if not candidates:
+                continue
+            within = [
+                txn
+                for txn in candidates
+                if self._amount_within_tolerance(
+                    card_amount, txn.amount, amount_tolerance_pct
+                )
+            ]
+            if not within:
+                continue
+            best = min(within, key=lambda txn: abs(txn.amount - card_amount))
+            if best not in found:
+                found.append(best)
         return found
+
+    @staticmethod
+    def _amount_within_tolerance(
+        card_amount: Decimal,
+        row_amount: Decimal,
+        tolerance_pct: float,
+    ) -> bool:
+        if card_amount == 0:
+            return row_amount == 0
+        if (card_amount > 0 and row_amount <= 0) or (card_amount < 0 and row_amount >= 0):
+            return False
+        delta_pct = abs(float((row_amount - card_amount) / card_amount * 100))
+        return delta_pct <= tolerance_pct
 
     def format_row(self, txn: Transaction) -> str:
         base = f"{txn.identificativo}|{txn.date}|{txn.amount}|{txn.description}"
