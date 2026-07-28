@@ -17,6 +17,8 @@ interface Props {
   resultFilter: ResultFilter;
   onResultFilterChange: (filter: ResultFilter) => void;
   onSelectTrace: (traceId: string) => void;
+  runStatus: string;
+  running: boolean;
 }
 
 export function ReportTable({
@@ -24,16 +26,14 @@ export function ReportTable({
   resultFilter,
   onResultFilterChange,
   onSelectTrace,
+  runStatus,
+  running,
 }: Props) {
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
 
   if (results.length === 0) {
-    return (
-      <p className="empty-state">
-        Il report si costruisce man mano: ogni transazione analizzata apparirà qui.
-      </p>
-    );
+    return <EmptyReport runStatus={runStatus} running={running} />;
   }
 
   const reuseMap = buildGestionaleReuseMap(results);
@@ -41,8 +41,15 @@ export function ReportTable({
     ? results.filter((row) => row.ambiguous || hasGestionaleReuse(row, reuseMap))
     : filterResults(results, resultFilter);
 
+  const canExport = visibleResults.length > 0 && !exporting;
+  const exportHint = exporting
+    ? "Esportazione in corso…"
+    : visibleResults.length === 0
+      ? "Nessuna riga nel filtro attuale da esportare."
+      : null;
+
   const handleExport = async () => {
-    if (visibleResults.length === 0 || exporting) return;
+    if (!canExport) return;
     setExporting(true);
     setExportError(null);
     try {
@@ -62,19 +69,42 @@ export function ReportTable({
           filter={resultFilter}
           onFilterChange={onResultFilterChange}
         />
-        <button
-          type="button"
-          className="btn btn--ghost"
-          disabled={visibleResults.length === 0 || exporting}
-          onClick={() => void handleExport()}
-        >
-          <Download size={16} />
-          {exporting ? "Esportazione…" : "Esporta XLSX"}
-        </button>
+        <div className="report-export">
+          <button
+            type="button"
+            className="btn btn--ghost"
+            disabled={!canExport}
+            title={exportHint ?? "Esporta le righe visibili in Excel"}
+            onClick={() => void handleExport()}
+          >
+            <Download size={16} />
+            {exporting ? "Esportazione…" : "Esporta XLSX"}
+          </button>
+          {exportHint && <p className="report-export__hint">{exportHint}</p>}
+        </div>
       </div>
-      {exportError && <p className="error-text">{exportError}</p>}
+      {exportError && (
+        <div className="error-panel" role="alert">
+          <span className="error-panel__title">Esportazione</span>
+          {exportError}
+        </div>
+      )}
       {visibleResults.length === 0 ? (
-        <p className="empty-state">Nessuna transazione corrisponde al filtro selezionato.</p>
+        <div className="empty-state empty-state--structured">
+          <p className="empty-state__title">Nessuna riga per questo filtro</p>
+          <p className="empty-state__body">
+            Il filtro selezionato non corrisponde ad alcuna transazione del report.
+          </p>
+          <div className="empty-state__action">
+            <button
+              type="button"
+              className="btn btn--ghost"
+              onClick={() => onResultFilterChange("all")}
+            >
+              Mostra tutte ({results.length})
+            </button>
+          </div>
+        </div>
       ) : (
       <table className="report-table">
         <thead>
@@ -151,6 +181,56 @@ export function ReportTable({
         </tbody>
       </table>
       )}
+    </div>
+  );
+}
+
+function EmptyReport({
+  runStatus,
+  running,
+}: {
+  runStatus: string;
+  running: boolean;
+}) {
+  if (running) {
+    return (
+      <div className="empty-state empty-state--structured">
+        <p className="empty-state__title">Report in costruzione</p>
+        <p className="empty-state__body">
+          Ogni transazione analizzata apparirà qui. Puoi seguire l&apos;attività live nell&apos;altra scheda.
+        </p>
+      </div>
+    );
+  }
+
+  if (runStatus === "completed" || runStatus === "stopped") {
+    return (
+      <div className="empty-state empty-state--structured">
+        <p className="empty-state__title">Nessun risultato in questa run</p>
+        <p className="empty-state__body">
+          La run è terminata senza righe di report. Controlla il subset o avvia una nuova analisi.
+        </p>
+      </div>
+    );
+  }
+
+  if (runStatus === "error") {
+    return (
+      <div className="empty-state empty-state--structured">
+        <p className="empty-state__title">Run interrotta da un errore</p>
+        <p className="empty-state__body">
+          Non ci sono risultati da mostrare. Controlla il messaggio di errore in Analisi e riprova.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="empty-state empty-state--structured">
+      <p className="empty-state__title">Nessun report ancora</p>
+      <p className="empty-state__body">
+        Avvia un&apos;analisi dalla colonna sinistra. Il report si riempie man mano che le transazioni vengono elaborate.
+      </p>
     </div>
   );
 }

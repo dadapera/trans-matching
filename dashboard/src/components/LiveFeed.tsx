@@ -20,6 +20,9 @@ interface Props {
   resultFilter: ResultFilter;
   filterTraceId: string | null;
   onFilterTrace: (traceId: string | null) => void;
+  sessionReady: boolean;
+  runStatus: string;
+  running: boolean;
 }
 
 interface TraceGroup {
@@ -52,6 +55,9 @@ export function LiveFeed({
   resultFilter,
   filterTraceId,
   onFilterTrace,
+  sessionReady,
+  runStatus,
+  running,
 }: Props) {
   const listRef = useRef<HTMLDivElement>(null);
   const shouldAutoScrollRef = useRef(true);
@@ -119,10 +125,11 @@ export function LiveFeed({
         ) : (
           <span className="live-feed__hint">Monitoraggio aggregato per transazione</span>
         )}
-        <div className="mode-switch" aria-label="Modalita log">
+        <div className="mode-switch" role="group" aria-label="Modalità log">
           <button
             type="button"
             className={`mode-switch__btn ${!debugMode ? "mode-switch__btn--active" : ""}`}
+            aria-pressed={!debugMode}
             onClick={() => setDebugMode(false)}
           >
             Normale
@@ -130,6 +137,7 @@ export function LiveFeed({
           <button
             type="button"
             className={`mode-switch__btn ${debugMode ? "mode-switch__btn--active" : ""}`}
+            aria-pressed={debugMode}
             onClick={() => setDebugMode(true)}
           >
             Debug
@@ -146,7 +154,12 @@ export function LiveFeed({
           </div>
         )}
         {traces.length === 0 && (
-          <p className="empty-state">Gli eventi dell&apos;agente appariranno qui in tempo reale.</p>
+          <EmptyLiveFeed
+            sessionReady={sessionReady}
+            running={running}
+            runStatus={runStatus}
+            hasSystemEvents={systemEvents.length > 0}
+          />
         )}
         {traces.map((trace) => (
           <TraceCard
@@ -160,6 +173,71 @@ export function LiveFeed({
           />
         ))}
       </div>
+    </div>
+  );
+}
+
+function EmptyLiveFeed({
+  sessionReady,
+  running,
+  runStatus,
+  hasSystemEvents,
+}: {
+  sessionReady: boolean;
+  running: boolean;
+  runStatus: string;
+  hasSystemEvents: boolean;
+}) {
+  if (running) {
+    return (
+      <div className="empty-state empty-state--structured">
+        <p className="empty-state__title">Analisi in corso</p>
+        <p className="empty-state__body">
+          Le card delle transazioni appariranno qui man mano che l&apos;agente le elabora.
+        </p>
+      </div>
+    );
+  }
+
+  if (runStatus === "completed" || runStatus === "stopped" || runStatus === "error") {
+    return (
+      <div className="empty-state empty-state--structured">
+        <p className="empty-state__title">Nessuna attività da mostrare</p>
+        <p className="empty-state__body">
+          {hasSystemEvents
+            ? "La run non ha prodotto tracce per transazione. Controlla gli eventi di sistema sopra o apri il Report."
+            : "Questa run non ha eventi live. Seleziona un&apos;altra run o avvia una nuova analisi."}
+        </p>
+      </div>
+    );
+  }
+
+  if (!sessionReady) {
+    return (
+      <div className="empty-state empty-state--structured">
+        <p className="empty-state__title">Pronto per riconciliare</p>
+        <p className="empty-state__body">Completa i tre passaggi nella colonna sinistra:</p>
+        <ol className="empty-state__steps">
+          <li>
+            <strong>Documenti</strong> — carica carta e gestionale
+          </li>
+          <li>
+            <strong>Subset</strong> — scegli le righe da analizzare
+          </li>
+          <li>
+            <strong>Analisi</strong> — premi Avvia
+          </li>
+        </ol>
+      </div>
+    );
+  }
+
+  return (
+    <div className="empty-state empty-state--structured">
+      <p className="empty-state__title">Documenti caricati</p>
+      <p className="empty-state__body">
+        Premi <strong>Avvia</strong> per iniziare. Gli eventi dell&apos;agente appariranno qui in tempo reale.
+      </p>
     </div>
   );
 }

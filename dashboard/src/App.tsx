@@ -58,6 +58,11 @@ export default function App() {
   const transactionCount = cartaCount ?? 0;
   const selectedTransactionCount =
     transactionCount > 0 ? transactionRange[1] - transactionRange[0] + 1 : 0;
+  const viewingPastRun =
+    runId !== null && !running && status !== "idle" && (status === "completed" || status === "stopped" || status === "error");
+  const sessionLabel = sessionReady
+    ? `${cartaCount ?? "?"} carta · ${gestionaleCount ?? "?"} gestionale`
+    : "Nessun documento";
 
   const loadRun = useCallback(async (id: number) => {
     setRunId(id);
@@ -334,6 +339,21 @@ export default function App() {
           <h1>Trans Matching</h1>
           <p className="header__sub">Agente contabile — carta vs gestionale</p>
         </div>
+        <div className="header__meta" aria-live="polite">
+          <span className={`session-chip${sessionReady ? " session-chip--ready" : ""}`}>
+            {sessionLabel}
+          </span>
+          {running && runId !== null && (
+            <span className="session-chip session-chip--live">
+              Live <span className="session-chip__id">#{runId}</span>
+            </span>
+          )}
+          {viewingPastRun && (
+            <span className="session-chip session-chip--past">
+              Run storica <span className="session-chip__id">#{runId}</span>
+            </span>
+          )}
+        </div>
       </header>
 
       <div className="layout">
@@ -369,9 +389,14 @@ export default function App() {
         </aside>
 
         <main className="main">
-          <div className="tabs">
+          <div className="tabs" role="tablist" aria-label="Vista principale">
             <button
               type="button"
+              role="tab"
+              id="tab-live"
+              aria-selected={tab === "live"}
+              aria-controls="panel-live"
+              tabIndex={tab === "live" ? 0 : -1}
               className={`tab ${tab === "live" ? "tab--active" : ""}`}
               onClick={() => setTab("live")}
             >
@@ -379,6 +404,11 @@ export default function App() {
             </button>
             <button
               type="button"
+              role="tab"
+              id="tab-report"
+              aria-selected={tab === "report"}
+              aria-controls="panel-report"
+              tabIndex={tab === "report" ? 0 : -1}
               className={`tab ${tab === "report" ? "tab--active" : ""}`}
               onClick={() => setTab("report")}
             >
@@ -386,7 +416,12 @@ export default function App() {
             </button>
           </div>
 
-          <div className="tab-panel">
+          <div
+            className="tab-panel"
+            role="tabpanel"
+            id={tab === "live" ? "panel-live" : "panel-report"}
+            aria-labelledby={tab === "live" ? "tab-live" : "tab-report"}
+          >
             {tab === "live" ? (
               <LiveFeed
                 events={events}
@@ -394,12 +429,17 @@ export default function App() {
                 resultFilter={resultFilter}
                 filterTraceId={filterTraceId}
                 onFilterTrace={setFilterTraceId}
+                sessionReady={sessionReady}
+                runStatus={status}
+                running={running}
               />
             ) : (
               <ReportTable
                 results={results}
                 resultFilter={resultFilter}
                 onResultFilterChange={setResultFilter}
+                runStatus={status}
+                running={running || starting}
                 onSelectTrace={(id) => {
                   setFilterTraceId(id);
                   setTab("live");
@@ -482,7 +522,7 @@ function TransactionRangePanel({
           </div>
         </>
       ) : (
-        <p className="hint-text">Carica la carta per scegliere il subset.</p>
+        <p className="hint-text">Carica la carta per scegliere il subset di righe da analizzare.</p>
       )}
     </section>
   );

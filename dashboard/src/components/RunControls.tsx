@@ -31,9 +31,18 @@ export function RunControls({
   const pending = starting || running;
   const statusBadgeStatus = starting ? "running" : status;
   const statusBadgeLabel = starting ? "Avvio…" : statusLabel(status);
+  const panelClass = [
+    "panel",
+    "run-controls",
+    ready && !pending ? "run-controls--ready" : "",
+    !ready && !pending ? "run-controls--blocked" : "",
+    pending ? "run-controls--sticky" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
-    <section className="panel run-controls">
+    <section className={panelClass}>
       <h2>Analisi</h2>
       <div className="status-row">
         <span className={`status-badge status-badge--${statusBadgeStatus}`}>
@@ -51,7 +60,7 @@ export function RunControls({
             </span>
             <span>{matchedCount} match</span>
           </div>
-          <div className="progress-bar">
+          <div className="progress-bar" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
             <div className="progress-bar__fill" style={{ width: `${pct}%` }} />
           </div>
         </div>
@@ -80,10 +89,18 @@ export function RunControls({
         </button>
       </div>
 
-      {!ready && !pending && (
-        <p className="hint-text">Carica carta (CSV/PDF) e gestionale PDF per avviare.</p>
+      {ready && !pending && (
+        <p className="ready-hint">Documenti pronti. Avvia l&apos;analisi sul subset selezionato.</p>
       )}
-      {error && <p className="error-text">{error}</p>}
+      {!ready && !pending && (
+        <p className="blocked-hint">Carica carta (CSV/PDF) e gestionale PDF per abilitare Avvia.</p>
+      )}
+      {error && (
+        <div className="error-panel" role="alert">
+          <span className="error-panel__title">Errore</span>
+          {error}
+        </div>
+      )}
     </section>
   );
 }
