@@ -1,0 +1,246 @@
+:root {
+  --bg: #f3efe6;
+  --bg-accent: #e4ddd0;
+  --ink: #1c1a16;
+  --muted: #5c564c;
+  --line: #c9c0b0;
+  --panel: #fffdf8;
+  --ok: #1f6b3a;
+  --warn: #8a3b12;
+  --btn: #1c1a16;
+  --btn-ink: #f3efe6;
+  --font: "IBM Plex Sans", "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", "Consolas", monospace;
+}
+
+html[data-theme="dark"] {
+  --bg: #161411;
+  --bg-accent: #221e18;
+  --ink: #ebe4d7;
+  --muted: #a79c8b;
+  --line: #3a342b;
+  --panel: #1d1914;
+  --ok: #6dca8c;
+  --warn: #e39a6a;
+  --btn: #ebe4d7;
+  --btn-ink: #161411;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--font);
+  color: var(--ink);
+  background:
+    radial-gradient(900px 420px at 10% -10%, var(--bg-accent), transparent 60%),
+    radial-gradient(700px 360px at 100% 0%, var(--bg-accent), transparent 55%),
+    var(--bg);
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--line);
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+h2 {
+  margin: 1.5rem 0 0.6rem;
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+main {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1.25rem 1.5rem 3rem;
+}
+
+.lead {
+  color: var(--muted);
+  margin: 0 0 1.25rem;
+}
+
+form {
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: 1fr 1fr auto;
+  align-items: end;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  padding: 1rem;
+}
+
+@media (max-width: 800px) {
+  form { grid-template-columns: 1fr; }
+}
+
+label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+}
+
+input[type="file"] {
+  width: 100%;
+  color: var(--ink);
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+  border: 1px solid var(--line);
+  background: var(--btn);
+  color: var(--btn-ink);
+  padding: 0.65rem 1rem;
+}
+
+#theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  padding: 0;
+  background: transparent;
+  color: var(--ink);
+}
+
+#theme-toggle .icon-sun,
+#theme-toggle .icon-moon {
+  display: none;
+}
+
+html[data-theme="light"] #theme-toggle .icon-moon { display: block; }
+html[data-theme="dark"] #theme-toggle .icon-sun { display: block; }
+
+.status {
+  margin: 0.55rem 0 0;
+  color: var(--muted);
+}
+
+.progress {
+  margin-top: 1.25rem;
+  padding: 0.85rem 1rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+}
+
+.bar {
+  height: 8px;
+  background: var(--bg-accent);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--ink);
+  transition: width 0.15s ease-out;
+}
+
+.summary:not([hidden]) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  font-family: var(--mono);
+  font-size: 0.92rem;
+}
+
+.summary .filter {
+  background: var(--panel);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  padding: 0.55rem 0.75rem;
+  cursor: pointer;
+}
+
+.summary .filter:hover {
+  border-color: var(--ink);
+}
+
+.summary .filter.active {
+  background: var(--ink);
+  color: var(--btn-ink);
+  border-color: var(--ink);
+}
+
+.summary .filter.ok:not(.active) { color: var(--ok); }
+.summary .filter.warn:not(.active) { color: var(--warn); }
+.summary .filter.active.ok,
+.summary .filter.active.warn { color: var(--btn-ink); }
+
+.exports:not([hidden]) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.export-btn {
+  background: var(--panel);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  padding: 0.55rem 0.75rem;
+}
+
+.export-btn:hover {
+  border-color: var(--ink);
+}
+
+.export-btn:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+#results {
+  margin-top: 1rem;
+}
+
+.table-wrap {
+  overflow: auto;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+th, td {
+  text-align: left;
+  padding: 0.55rem 0.7rem;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+
+th {
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+td.num {
+  font-family: var(--mono);
+  white-space: nowrap;
+}
+
+tbody tr:last-child td { border-bottom: 0; }

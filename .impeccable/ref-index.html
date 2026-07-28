@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="it" data-theme="light"><head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Statements Matcher</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="top">
+    <h1>Statements Matcher</h1>
+    <button type="button" id="theme-toggle" aria-label="Cambia tema chiaro/scuro" title="Tema">
+      <svg class="icon-sun" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4"></circle>
+        <path d="M12 2v2"></path>
+        <path d="M12 20v2"></path>
+        <path d="m4.93 4.93 1.41 1.41"></path>
+        <path d="m17.66 17.66 1.41 1.41"></path>
+        <path d="M2 12h2"></path>
+        <path d="M20 12h2"></path>
+        <path d="m6.34 17.66-1.41 1.41"></path>
+        <path d="m19.07 4.93-1.41 1.41"></path>
+      </svg>
+      <svg class="icon-moon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path>
+      </svg>
+    </button>
+  </header>
+
+  <main>
+    <p class="lead">Match banca ÔåÆ SIAP su data + importo esatti (addebiti e accrediti).</p>
+
+    <form id="match-form">
+      <label>
+        Estratto conto banca (PDF)
+        <input type="file" name="bank" accept="application/pdf,.pdf" required="">
+      </label>
+      <label>
+        Estratto SIAP (PDF)
+        <input type="file" name="siap" accept="application/pdf,.pdf" required="">
+      </label>
+      <button type="submit" id="run">Confronta</button>
+    </form>
+
+    <div id="progress" class="progress" hidden="">
+      <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div id="bar-fill" class="bar-fill"></div>
+      </div>
+      <p id="status" class="status"></p>
+    </div>
+
+    <section id="summary" class="summary" hidden="" role="tablist" aria-label="Filtri risultati"></section>
+
+    <section id="exports" class="exports" hidden="" aria-label="Esporta PDF">
+      <button type="button" id="export-missing" class="export-btn" disabled="">Esporta mancanti SIAP (PDF)</button>
+      <button type="button" id="export-extra" class="export-btn" disabled="">Esporta extra SIAP (PDF)</button>
+    </section>
+
+    <section id="results" hidden="">
+      <h2 id="results-title"></h2>
+      <div class="table-wrap">
+        <table>
+          <thead id="results-head"></thead>
+          <tbody id="results-body"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+
+</body></html>
