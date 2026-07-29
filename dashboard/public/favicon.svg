@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Trans Matching">
+  <rect width="32" height="32" fill="#f3efe6"/>
+  <!-- Top ledger (carta) -->
+  <rect x="6" y="6" width="20" height="5" fill="#1c1a16"/>
+  <!-- Bottom ledger (gestionale) -->
+  <rect x="6" y="21" width="20" height="5" fill="#1c1a16"/>
+  <!-- Match connector -->
+  <rect x="14" y="11" width="4" height="10" fill="#1c1a16"/>
+  <!-- Match node -->
+  <rect x="12" y="14" width="8" height="4" fill="#1c1a16"/>
+</svg>
