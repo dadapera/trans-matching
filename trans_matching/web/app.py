@@ -232,6 +232,14 @@ if DASHBOARD_DIST.is_dir():
     async def spa_fallback(full_path: str) -> FileResponse:
         if full_path.startswith("api/"):
             raise HTTPException(status_code=404)
+        # Serve Vite public/ files from dist root (favicon, robots, etc.)
+        candidate = (DASHBOARD_DIST / full_path).resolve()
+        try:
+            candidate.relative_to(DASHBOARD_DIST.resolve())
+        except ValueError:
+            raise HTTPException(status_code=404) from None
+        if candidate.is_file():
+            return FileResponse(candidate)
         index = DASHBOARD_DIST / "index.html"
         if not index.is_file():
             raise HTTPException(status_code=404)
