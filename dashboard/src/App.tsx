@@ -335,10 +335,7 @@ export default function App() {
   return (
     <div className="app">
       <header className="header">
-        <div>
-          <h1>Trans Matching</h1>
-          <p className="header__sub">Agente contabile — carta vs gestionale</p>
-        </div>
+        <h1>Trans Matching</h1>
         <div className="header__meta" aria-live="polite">
           <span className={`session-chip${sessionReady ? " session-chip--ready" : ""}`}>
             {sessionLabel}
